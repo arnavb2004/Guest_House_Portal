@@ -100,6 +100,7 @@ export async function createReservation(req, res) {
     
     // Fix: Add proper null checks for receipt and files
     let receiptid = null;
+    if (!req.files?.receipt?.[0]) return res.status(400).json({ message:"Receipt file is required" })	// checking purpose of this
     if (req.files && req.files["receipt"] && req.files["receipt"][0]) {
       receiptid = req.files["receipt"][0].id;
     } else {

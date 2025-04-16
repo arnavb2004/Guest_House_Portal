@@ -397,7 +397,7 @@ function AdminReservationForm() {
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
       try {
-        const res = await http.post("reservation/", formDataToSend, {
+        const res = await http.post("/reservation/", formDataToSend, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
