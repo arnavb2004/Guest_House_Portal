@@ -1,3 +1,7 @@
 node_modules
 .env
 client/build
+# SSH keys
+deploy_key*
+*.pem
+*.key
