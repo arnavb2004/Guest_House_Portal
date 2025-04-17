@@ -1,31 +1,46 @@
-   name: Deploy to VM
-   
-   on:
-     push:
-       branches: [main]
-       paths:
-         - 'server/**'
-   
-   jobs:
-     deploy:
-       runs-on: ubuntu-latest
-       steps:
-         - name: Checkout code
-           uses: actions/checkout@v3
-   
-         - name: Setup SSH key
-           run: |
-             mkdir -p ~/.ssh
-             echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-             chmod 600 ~/.ssh/id_ed25519
-             ssh-keyscan -t ed25519 ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
-   
-         - name: Deploy to VM
-           run: |
-             ssh -i ~/.ssh/id_ed25519 ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} '
-               cd ~/Guest_House_Portal &&
-               git pull &&
-               cd server &&
-               npm install &&
-               pm2 restart all
-             '
+name: Deploy to VM
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Debug info
+        run: |
+          echo "Running deployment for commit ${{ github.sha }}"
+          echo "Repository: ${{ github.repository }}"
+          
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Debug SSH key
+        run: |
+          echo "Setting up SSH with verbose debugging"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ls -la ~/.ssh/
+          
+      - name: Add host key
+        run: |
+          ssh-keyscan -t rsa ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+          echo "Added host key"
+          
+      - name: Test SSH connection
+        run: |
+          echo "Testing SSH connection..."
+          ssh -v -i ~/.ssh/deploy_key ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} 'echo "SSH CONNECTION SUCCESSFUL"'
+          
+      - name: Deploy to VM
+        run: |
+          echo "Deploying to VM..."
+          ssh -v -i ~/.ssh/deploy_key ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} '
+            cd ~/Guest_House_Portal &&
+            git pull &&
+            cd server &&
+            npm install &&
+            pm2 restart all
+          '
