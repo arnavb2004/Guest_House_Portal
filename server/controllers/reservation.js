@@ -70,7 +70,7 @@ export async function createReservation(req, res) {
 
     // Validate required fields
     if (!guestName || !arrivalDate || !departureDate || !category) {
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({ message: "checking, Missing required fields" });
     }
   
     const ms = Number(
