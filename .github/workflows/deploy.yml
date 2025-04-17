@@ -1,0 +1,29 @@
+name: Deploy to VM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to VM
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} '
+            cd ~/Guest_House_Portal &&
+            git pull &&
+            cd server &&
+            npm install &&
+            pm2 restart all
+          '
