@@ -38,6 +38,11 @@ await connection;
 const storage = new GridFsStorage({ url: process.env.MONGO_URL });
 storage.on("connection", () => {});
 const upload = multer({ storage });
+// Add this after your app is initialized
+app.use((req, res, next) => {
+  res.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
 
 app.use(cors());
 app.use(express.json()); //for parsing application/json
