@@ -2,21 +2,38 @@ name: Deploy Frontend
 
 on:
   push:
-    branches: [ main ]  # or your primary branch name
+    branches: [ main ]
+    paths:
+      - 'client/**'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: Debug secrets
+        run: |
+          echo "Has FRONTEND_HOST: ${{ secrets.FRONTEND_HOST != '' }}"
+          echo "Has FRONTEND_USER: ${{ secrets.FRONTEND_USER != '' }}"
+          echo "Has FRONTEND_KEY: ${{ secrets.FRONTEND_KEY != '' }}"
+        
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.FRONTEND_HOST }} >> ~/.ssh/known_hosts
+        
       - name: Deploy to VM
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.FRONTEND_HOST }}
+          username: ${{ secrets.FRONTEND_USER }}
+          key: ${{ secrets.FRONTEND_KEY }}
           script: |
-            cd ~/Guest_House_Portal/client
+            cd ~/Guest_House_Portal
             git pull
+            cd client
             npm install
             npm run build
             sudo cp -r build/* /var/www/html/

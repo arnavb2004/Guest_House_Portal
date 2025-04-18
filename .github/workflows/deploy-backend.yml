@@ -1,46 +1,38 @@
-name: Deploy backend to VM
+name: Deploy Backend
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
+    paths:
+      - 'server/**'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug info
-        run: |
-          echo "Running deployment for commit ${{ github.sha }}"
-          echo "Repository: ${{ github.repository }}"
-          
       - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Debug SSH key
+        uses: actions/checkout@v2
+        
+      - name: Debug secrets
         run: |
-          echo "Setting up SSH with verbose debugging"
+          echo "Has BACKEND_HOST: ${{ secrets.BACKEND_HOST != '' }}"
+          echo "Has BACKEND_USER: ${{ secrets.BACKEND_USER != '' }}"
+          echo "Has BACKEND_KEY: ${{ secrets.BACKEND_KEY != '' }}"
+        
+      - name: Add host to known_hosts
+        run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ls -la ~/.ssh/
-          
-      - name: Add host key
-        run: |
-          ssh-keyscan -t rsa ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
-          echo "Added host key"
-          
-      - name: Test SSH connection
-        run: |
-          echo "Testing SSH connection..."
-          ssh -v -i ~/.ssh/deploy_key ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} 'echo "SSH CONNECTION SUCCESSFUL"'
-          
+          ssh-keyscan -H ${{ secrets.BACKEND_HOST }} >> ~/.ssh/known_hosts
+        
       - name: Deploy to VM
-        run: |
-          echo "Deploying to VM..."
-          ssh -v -i ~/.ssh/deploy_key ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} '
-            cd ~/Guest_House_Portal &&
-            git pull &&
-            cd server &&
-            npm install &&
-            pm2 restart all
-          '
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.BACKEND_HOST }}
+          username: ${{ secrets.BACKEND_USER }}
+          key: ${{ secrets.BACKEND_KEY }}
+          script: |
+            cd ~/Guest_House_Portal
+            git pull
+            cd server
+            npm install
+            pm2 restart backend || pm2 start --name backend "node index.js"
