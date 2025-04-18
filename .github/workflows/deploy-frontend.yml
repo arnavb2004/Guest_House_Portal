@@ -30,6 +30,7 @@ jobs:
           host: ${{ secrets.FRONTEND_HOST }}
           username: ${{ secrets.FRONTEND_USER }}
           key: ${{ secrets.FRONTEND_KEY }}
+          command_timeout: "30m"  # Increase timeout to 30 minutes
           script: |
             cd ~/Guest_House_Portal
             git pull
