@@ -21,7 +21,6 @@ export const sliderItems = [
     img: img2,
     title: "Gate Entry",
   },
-
   {
     key: 3,
     img: img4,
