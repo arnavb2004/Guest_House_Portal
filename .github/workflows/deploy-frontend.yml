@@ -36,6 +36,6 @@ jobs:
             git pull
             cd client
             npm install
-            npm run build
+            unzip -o /path/to/uploaded/build.zip -d .
             sudo cp -r build/* /var/www/html/
             pm2 restart frontend || pm2 start --name frontend "npx serve -s /var/www/html -l 3000"
