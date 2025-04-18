@@ -1,41 +1,23 @@
-name: Deploy frontend to VM
+name: Deploy Frontend
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'client/**'
+    branches: [ main ]  # or your primary branch name
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@master
         with:
-          node-version: '16'
-          
-      - name: Install dependencies and build
-        run: |
-          cd client
-          npm ci
-          npm run build
-      
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -t rsa ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
-          
-      - name: Deploy frontend to VM
-        run: |
-          echo "Deploying frontend to VM..."
-          scp -i ~/.ssh/deploy_key -r client/build/* ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }}:~/Guest_House_Portal/client/build/
-          
-      - name: Restart Nginx
-        run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} 'sudo systemctl restart nginx'
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/Guest_House_Portal/client
+            git pull
+            npm install
+            npm run build
+            sudo cp -r build/* /var/www/html/
+            pm2 restart frontend || pm2 start --name frontend "npx serve -s /var/www/html -l 3000"
