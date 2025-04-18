@@ -32,7 +32,6 @@ export const getTime = (dateString) => {
 
   // Formatting time in 12-hour clock format
   const time = `${hours12}:${minutes} ${ampm}`;
-
   return time;
 };
 
