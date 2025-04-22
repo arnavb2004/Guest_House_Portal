@@ -22,6 +22,8 @@ jobs:
 
       - name: Build production bundle
         working-directory: ./client
+        env:
+          CI: false
         timeout-minutes: 20   # ← you can also bump just this step to 20m
         run: |
           npm ci
