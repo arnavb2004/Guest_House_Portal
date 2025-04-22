@@ -134,6 +134,7 @@ export async function createReservation(req, res) {
 
     if (req.user.role === "ADMIN") {
       // First, add ADMIN as a reviewer
+      if(guestName === "") guestName = "ADMIN";
       reviewersArray = [{ role: "ADMIN", comments: "", status: "PENDING" }];
       
       // For specific categories, add CHAIRMAN as a reviewer too
@@ -207,6 +208,65 @@ export async function createReservation(req, res) {
     res.status(400).json({ message: error.message });
   }
 }
+
+export const updateRoomBookings = async (req, res) => {
+  try {
+    const { id } = req.params; // Reservation ID
+    const { user, startDate, endDate, roomNumber, _id } = req.body; // Updated data
+    const resid = id;
+    // Find the Reservation by ID
+    let reservation = await Reservation.findById(id);
+    if (!reservation) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+    
+    // console.log("Reservation ", reservation);
+    // Find the Room by roomNumber
+    let room = await Room.findOne({ roomNumber });
+    if (!room) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+    // console.log("Room " , room);
+    // Find the Booking in the Room's bookings array
+    // console.log("resid", resid);
+    let roomBooking = room.bookings.find((b) => b.resid.toString() == resid);
+    // let roomBooking = room.bookings.find((b) => console.log("id : ", b._id.toString()));
+
+    if (!roomBooking) {
+      return res.status(404).json({ message: "Room booking not found" });
+    }
+
+    // Update Room's booking details
+    roomBooking.user = user;
+    roomBooking.startDate = new Date(startDate);
+    roomBooking.endDate = new Date(endDate);
+
+    // Find the Booking in the Reservation's bookings array
+    let reservationBooking = reservation.bookings.find((b) => b.roomNumber === roomNumber);
+    if (!reservationBooking) {
+      return res.status(404).json({ message: "Booking not found in reservation" });
+    }
+
+    // Update Reservation's booking details
+    reservationBooking.user = user;
+    reservationBooking.startDate = new Date(startDate);
+    reservationBooking.endDate = new Date(endDate);
+
+    // Save both Room and Reservation
+    await room.save();
+    await reservation.save();
+
+    res.status(200).json({
+      message: "Room booking updated successfully",
+      updatedRoomBooking: roomBooking,
+      updatedReservationBooking: reservationBooking,
+    });
+
+  } catch (error) {
+    console.error("Error updating room booking:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
 
 export async function getAllReservationDetails(req, res) {
   try {
@@ -799,6 +859,268 @@ export const getRooms = async (req, res) => {
   }
 };
 
+export const sendReminder = async (req, res) => {
+  const id = req.body.reservationId;
+  try{
+  const reservation = await Reservation.findById(id);
+  if (!reservation) {
+    return res.status(404).json({ message: "Reservation not found" });
+  }
+  // console.log(reservation);
+  const email = reservation.guestEmail;
+  sendVerificationEmail(
+    [email], 
+    "Payment Reminder",
+    `<div>This is a reminder for payment of your reservation.</div><br><br>
+    <div>Guest Name: ${reservation.guestName}</div>
+        <div>Guest Email: ${email}</div>
+        <div>Number of Guests: ${reservation.numberOfGuests}</div>
+        <div>Number of Rooms: ${reservation.numberOfRooms}</div>
+        <div>Room Type: ${reservation.roomType}</div>
+        <div>Purpose: ${reservation.purpose}</div>
+        <div>Arrival Date: ${new Date(reservation.arrivalDate).toISOString().split("T")[0]}</div>
+        <div>Arrival Time: ${reservation.arrivalTime}</div>
+        <div>Departure Date: ${new Date(reservation.departureDate).toISOString().split("T")[0]}</div>
+        <div>Departure Time: ${reservation.departureTime}</div>
+        <div>Address: ${reservation.address}</div>
+        <div>Category: ${reservation.category}</div>
+        <div>Payment Amount: ${reservation.payment.amount}</div>`
+  );
+  res.status(200).json({ message: "Reminder sent successfully!" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to send reminder", error: error.message });
+  }
+};
+
+export const sendReminderAll = async (req, res) => {
+  const paymentdetails = req.body.pendingPaymentsDetails;
+  try{
+  for(const i in paymentdetails) {
+    const reservation = await Reservation.findById(paymentdetails[i].reservationId);
+
+  // const reservation = await Reservation.findById(id);
+  if (!reservation) {
+    return res.status(404).json({ message: "Reservation not found" });
+  }
+  // console.log(reservation);
+  const email = reservation.guestEmail;
+  sendVerificationEmail(
+    [email], 
+    "Payment Reminder",
+    `<div>This is a reminder for payment of your reservation.</div><br><br>
+    <div>Guest Name: ${reservation.guestName}</div>
+        <div>Guest Email: ${email}</div>
+        <div>Number of Guests: ${reservation.numberOfGuests}</div>
+        <div>Number of Rooms: ${reservation.numberOfRooms}</div>
+        <div>Room Type: ${reservation.roomType}</div>
+        <div>Purpose: ${reservation.purpose}</div>
+        <div>Arrival Date: ${new Date(reservation.arrivalDate).toISOString().split("T")[0]}</div>
+        <div>Arrival Time: ${reservation.arrivalTime}</div>
+        <div>Departure Date: ${new Date(reservation.departureDate).toISOString().split("T")[0]}</div>
+        <div>Departure Time: ${reservation.departureTime}</div>
+        <div>Address: ${reservation.address}</div>
+        <div>Category: ${reservation.category}</div>
+        <div>Payment Amount: ${reservation.payment.amount}</div>`
+  );
+}
+  res.status(200).json({ message: "Reminder sent successfully!" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to send reminder", error: error.message });
+  }
+};
+
+export const removeFromList = async (req, res) => {
+  if (req.user?.role !== "ADMIN") {
+    return res.status(403).json({ message: "Unauthorized action" });
+  }
+
+  const { id } = req.params; // Reservation ID
+  const { roomNumber } = req.body; // Room to remove
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // Find the reservation
+    const reservation = await Reservation.findById(id);
+    if (!reservation) {
+      throw new Error("Reservation not found");
+    }
+
+    // Find the room and remove its booking
+    const room = await Room.findOne({ roomNumber });
+    if (!room) {
+      throw new Error(`Room ${roomNumber} not found`);
+    }
+    //console.log("room bookings", room.bookings);
+    // Remove the booking from the room
+    //console.log(reservation._id);
+    // console.log(booking.roomNumber._id);
+    room.bookings = room.bookings.filter((booking) => booking.resid !== reservation._id.toString() );
+    await room.save();
+    //console.log("updated room bookings", room.bookings);
+    // Remove the room from the reservation
+    
+    reservation.bookings = reservation.bookings.filter((booking) => booking.roomNumber !== roomNumber);
+    await reservation.save();
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({ message: `Room ${roomNumber} unassigned successfully` });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(400).json({ message: error.message || "Failed to remove room" });
+  }
+};
+
+
+export const monthlyReport = async (req, res) => {
+  try {
+    const { month } = req.params; // Extract month from URL (YYYY-MM)
+    if (!month) {
+      return res.status(400).json({ message: "Month is required in format YYYY-MM" });
+    }
+
+    // Define start and end dates for the month
+    const startDate = new Date(`${month}-01T00:00:00.000Z`);
+    const endDate = new Date(`${month}-31T23:59:59.999Z`);
+
+    // Fetch reservations where at least one booking falls in the month
+    const reservations = await Reservation.find({
+      "bookings.startDate": { $gte: startDate, $lt: endDate },
+    });
+
+    // console.log("Reservations", reservations);
+    
+    // Initialize report summary
+    let totalBookings = 0;
+    let totalRevenue = 0;
+    let totalCheckedOut = 0;
+    let totalPendingPayments = 0;
+    let totalPendingPaymentsDetails = [];
+    let categoryData = {}; // Stores data by category
+
+    reservations.forEach((reservation) => {
+      // reservation.bookings.forEach((booking) => {
+        if (reservation.arrivalDate >= startDate && reservation.departureDate <= endDate) {
+          totalBookings++;
+
+          let category = reservation.category || "Uncategorized"; // Ensure category exists
+          if (!categoryData[category]) {
+            categoryData[category] = { 
+              revenue: 0, 
+              pendingPayments: 0, 
+              totalBookings: 0, 
+              checkedOut: 0,
+              pendingPaymentsDetails: []
+            };
+          }
+
+          let revenue = reservation.payment.amount || 0;
+          totalRevenue += revenue;
+          categoryData[category].revenue += revenue;
+          categoryData[category].totalBookings++;
+
+          if (reservation.checkOut) {
+            totalCheckedOut++;
+            categoryData[category].checkedOut++;
+          }
+
+          if (reservation.payment.status === "PENDING") {
+            totalPendingPayments += reservation.payment.amount;
+            totalPendingPaymentsDetails.push({
+              reservationId: reservation._id,
+              category : reservation.category,
+              guestName : reservation.guestName,
+              applicantEmail : reservation.guestEmail,
+              applicantName : reservation.applicant.name,
+              paymentAmount : reservation.payment.amount,
+              paymentMode : reservation.payment.source
+            });
+            categoryData[category].pendingPayments += reservation.payment.amount;
+            categoryData[category].pendingPaymentsDetails.push({
+              reservationId: reservation._id,
+              guestName : reservation.guestName,
+              applicantEmail : reservation.guestEmail,
+              applicantName : reservation.applicant.name,
+              paymentAmount : reservation.payment.amount,
+              paymentMode : reservation.payment.source
+            });
+          }
+        }
+      // );
+    });
+
+    // Convert category data into an array format
+    const categories = Object.keys(categoryData).map((cat) => ({
+      name: cat,
+      totalBookings: categoryData[cat].totalBookings,
+      revenue: categoryData[cat].revenue,
+      checkedOut: categoryData[cat].checkedOut,
+      pendingPayments: categoryData[cat].pendingPayments,
+      pendingPaymentsDetails: categoryData[cat].pendingPaymentsDetails
+    }));
+
+    res.json({
+      month,
+      totalBookings,
+      revenue: totalRevenue,
+      checkedOut: totalCheckedOut,
+      pendingPayments: totalPendingPayments,
+      pendingPaymentsDetails: totalPendingPaymentsDetails,
+      categories,
+    });
+
+  } catch (error) {
+    console.error("Error generating monthly report:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const getAllRooms = async (req, res) => {
+  try {
+    const currentDate = new Date();
+
+    // Fetch all rooms
+    const rooms = await Room.find();
+
+    // Map through each room to filter and update booking data
+    const updatedRooms = await Promise.all(rooms.map(async (room) => {
+      // Filter future bookings based on endDate
+      const futureBookings = room.bookings;
+
+      // For each future booking, find the corresponding reservation
+      const updatedBookings = await Promise.all(futureBookings.map(async (booking) => {
+        const reservation = await Reservation.findById(booking.resid); // Assuming resid is the reservation's ID
+        
+        // If the reservation is found, add the purpose, otherwise default to 'No Purpose'
+        return {
+          ...booking._doc,
+          purpose: reservation ? reservation.purpose : 'No Purpose',
+
+          roomNumber: room.roomNumber
+        };
+      }));
+
+      // Return room with updated bookings
+      return {
+        ...room._doc,
+        bookings: updatedBookings
+      };
+    }));
+
+    // console.log("Updated rooms with booking details:", updatedRooms);
+    // Send the updated rooms with booking details back as response
+    res.json(updatedRooms);
+
+  } catch (error) {
+    console.error("Error fetching rooms:", error);
+    res.status(500).json({ message: "Error fetching rooms", error });
+  }
+};
+
 export const addRoom = async (req, res) => {
   if (req.user?.role !== "ADMIN")
     return res
@@ -806,7 +1128,8 @@ export const addRoom = async (req, res) => {
       .json({ message: "You are not authorized to perform this action" });
   try {
     const roomNumber = req.body.roomNumber;
-    const newRoom = await Room.create({ roomNumber: roomNumber });
+    const roomType = req.body.roomType;
+    const newRoom = await Room.create({ roomNumber: roomNumber , roomType: roomType});
     res.status(200).json({ message: "Room added Successfully", room: newRoom });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -866,12 +1189,12 @@ export const updateRooms = async (req, res) => {
       .status(403)
       .json({ message: "You are not authorized to perform this action" });
   }
-
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { id } = req.params; // Reservation ID
+    //console.log("id", id);
     const allottedRooms = req.body; // Updated room assignments
 
     // Fetch the previous reservation details
@@ -879,42 +1202,45 @@ export const updateRooms = async (req, res) => {
     if (!prevReservation) {
       throw new Error("Reservation not found", 404);
     }
-
+    
+    const RoomsRequest = prevReservation.numberOfRooms;
+    
     const prevAllottedRooms = prevReservation.bookings;
 
     // Step 1: Remove old room assignments no longer in the updated list
-    for (const prevRoom of prevAllottedRooms) {
-      // Check if the room exists in the new allottedRooms; if not, unassign it
-      const isStillAssigned = allottedRooms.some(
-        (room) =>
-          room.roomNumber === prevRoom.roomNumber &&
-          room.startDate === prevRoom.startDate &&
-          room.endDate === prevRoom.endDate
-      );
+    // for (const prevRoom of prevAllottedRooms) {
+    //   // Check if the room exists in the new allottedRooms; if not, unassign it
+    //   const isStillAssigned = allottedRooms.some(
+    //     (room) =>
+    //       room.roomNumber === prevRoom.roomNumber &&
+    //       room.startDate === prevRoom.startDate &&
+    //       room.endDate === prevRoom.endDate
+    //   );
 
-      if (!isStillAssigned) {
-        const room = await Room.findOne({ roomNumber: prevRoom.roomNumber });
-        if (!room) {
-          throw new Error(
-            `Room with number ${prevRoom.roomNumber} not found`,
-            400
-          );
-        }
+    //   if (!isStillAssigned) {
+    //     const room = await Room.findOne({ roomNumber: prevRoom.roomNumber });
+    //     if (!room) {
+    //       throw new Error(
+    //         `Room with number ${prevRoom.roomNumber} not found`,
+    //         400
+    //       );
+    //     }
 
-        // Remove the booking for the specified date range
-        const bookingIndex = room.bookings.findIndex(
-          (booking) =>
-            getDate(booking.startDate) === getDate(prevRoom.startDate) &&
-            getDate(booking.endDate) === getDate(prevRoom.endDate)
-        );
+    //     // Remove the booking for the specified date range
+    //     const bookingIndex = room.bookings.findIndex(
+    //       (booking) =>
+    //         getDate(booking.startDate) === getDate(prevRoom.startDate) &&
+    //         getDate(booking.endDate) === getDate(prevRoom.endDate)
+    //     );
 
-        if (bookingIndex !== -1) {
-          room.bookings.splice(bookingIndex, 1); // Unassign the room
-          await room.save();
-        }
-      }
-    }
-
+    //     if (bookingIndex !== -1) {
+    //       room.bookings.splice(bookingIndex, 1); // Unassign the room
+    //       await room.save();
+    //     }
+    //   }
+    // }
+    const resid = id;
+    console.log("resid ", resid);
     // Step 2: Assign new rooms or update existing bookings
     for (const newRoom of allottedRooms) {
       const { roomNumber, startDate, endDate, user } = newRoom;
@@ -923,8 +1249,11 @@ export const updateRooms = async (req, res) => {
       if (!room) {
         throw new Error(`Room with number ${roomNumber} not found`, 400);
       }
-
+      const alreadyAssigned = room.bookings.some(
+        (booking) => booking.resid?.toString() === resid.toString()
+      );
       // Check if the room is available for the specified date range
+      if(!alreadyAssigned){
       const isAvailable = await isDateRangeAvailable(room, startDate, endDate);
       if (!isAvailable) {
         throw new Error(
@@ -932,11 +1261,23 @@ export const updateRooms = async (req, res) => {
           400
         );
       }
-
+     
       // Add the new booking
-      room.bookings.push({ startDate, endDate, user });
+      room.bookings.push({ startDate, endDate,resid, user });
       await room.save();
     }
+    }
+
+// const updatedBookings = [
+  // Keep only the previous rooms that are NOT in the new allotment
+  // ...prevReservation.bookings.filter(
+//     (prevRoom) =>
+//       !allottedRooms.some(
+//         (newRoom) => newRoom.roomNumber === prevRoom.roomNumber
+//       )
+//   ),
+//   ...allottedRooms, // Add the new/updated rooms
+// ];
 
     // Step 3: Update the reservation document
     const updatedReservation = await Reservation.findByIdAndUpdate(
@@ -944,6 +1285,11 @@ export const updateRooms = async (req, res) => {
       { $set: { bookings: allottedRooms, stepsCompleted: 3 } },
       { new: true, session }
     );
+    // const updatedReservation = await Reservation.findByIdAndUpdate(
+    //   id,
+    //   { $set: { bookings: updatedBookings, stepsCompleted: 3 } },  
+    //   { new: true, session }
+    // );
 
     if (!updatedReservation) {
       throw new Error("Failed to update reservation", 400);
@@ -952,7 +1298,12 @@ export const updateRooms = async (req, res) => {
     // Commit the transaction
     await session.commitTransaction();
     session.endSession();
-
+    if(req.method === "PUT" && RoomsRequest > allottedRooms.length){
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient rooms allotted. Guest requested ${RoomsRequest} rooms, but only ${allottedRooms.length} assigned.`,
+      });
+    }
     res.status(200).json({
       message: "Rooms and reservation updated successfully",
       reservation: updatedReservation,

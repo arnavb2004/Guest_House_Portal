@@ -536,7 +536,7 @@ export default function RecordList({ status = "pending", desc }) {
               return (
                 <div
                   key={record._id}
-                  className="border-b border-gray-100 items-center flex gap-4 text-center justify-around px-4 p-1 text-[1vw]"
+                  className="border-b-[1px] border-gray-100 items-center flex gap-4 text-center justify-around px-4 p-1 text-[1vw]"
                 >
                   <div className="flex items-center gap-2 w-[15%] overflow-hidden">
                     <Checkbox
@@ -555,18 +555,8 @@ export default function RecordList({ status = "pending", desc }) {
                   <div className="w-[10%]">{getDate(record.arrivalDate)}</div>
                   <div className="w-[10%]">{getDate(record.departureDate)}</div>
                   <div className="w-[10%]">{record.roomType}</div>
-                  {record.bookings?.length > 0 ? (
-                    <div className="w-[10%]">
-                      {record.bookings.map((booking, index) => (
-                        <span key={index} className="text-green-600">
-                          {booking.roomNumber}
-                          {index < record.bookings.length - 1 ? ", " : ""}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="w-[10%]">No</div>
-                  )}
+                  {record.bookings?.length === record.numberOfRooms && <div className="w-[10%]">Yes</div>}
+                  {record.bookings?.length !== record.numberOfRooms && <div className="w-[10%]">No</div>}
                   <div className="flex justify-evenly items-center gap-4 w-[8%]">
                     <IconButton size="small"
                       onClick={() => {

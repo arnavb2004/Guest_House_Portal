@@ -29,7 +29,13 @@ import {
   checkoutToday,
   getDiningAmount,
   deleteReservations,
-  editReservation
+  editReservation,
+  getAllRooms,
+  monthlyReport,
+  sendReminder,
+  sendReminderAll,
+  removeFromList,
+  updateRoomBookings,
 } from "../controllers/reservation.js";
 
 const Router = express.Router();
@@ -75,6 +81,12 @@ Router.get("/aggregated-data", async (req, res) => {
     });
   }
 });
+Router.put("/rooms/:id/update", updateRoomBookings);
+Router.put("/rooms/:id/remove", removeFromList);
+Router.post("/send-reminder-all", sendReminderAll);
+Router.post("/send-reminder", sendReminder);
+Router.get("/reports/monthly/:month", monthlyReport);
+Router.get("/room-details", getAllRooms);
 Router.get("/current", getCurrentReservations);
 Router.get("/late", getLateCheckoutReservations);
 Router.get("/checkedout", getCheckedOutReservations);

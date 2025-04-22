@@ -14,6 +14,15 @@ const userSchema = new Schema({
   contact: {
     type: String,
   },
+  department: {
+    type :String,
+  },
+  designation: {
+    type: String,
+  },
+  ecode: {
+    type: String,
+  },
   refreshToken: {
     type: String,
     default: "",
