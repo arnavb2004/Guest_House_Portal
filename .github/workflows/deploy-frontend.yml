@@ -7,35 +7,48 @@ on:
       - 'client/**'
 
 jobs:
-  deploy:
+  build_and_deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20    # ← give the whole job up to 20m instead of the default 360m
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-        
-      - name: Debug secrets
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+
+      - name: Build production bundle
+        working-directory: ./client
+        timeout-minutes: 20   # ← you can also bump just this step to 20m
+        run: |
+          npm ci
+          npm run build
+
+      - name: Debug deploy secrets
         run: |
           echo "Has FRONTEND_HOST: ${{ secrets.FRONTEND_HOST != '' }}"
           echo "Has FRONTEND_USER: ${{ secrets.FRONTEND_USER != '' }}"
           echo "Has FRONTEND_KEY: ${{ secrets.FRONTEND_KEY != '' }}"
-        
-      - name: Add host to known_hosts
+
+      - name: Add VM to known_hosts
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.FRONTEND_HOST }} >> ~/.ssh/known_hosts
-        
-      - name: Deploy to VM
+
+      - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.FRONTEND_HOST }}
           username: ${{ secrets.FRONTEND_USER }}
           key: ${{ secrets.FRONTEND_KEY }}
-          command_timeout: "30m"  # Increase timeout to 30 minutes
           script: |
-            cd ~/Guest_House_Portal
+            cd ~/Guest_House_Portal/client
             git pull
-            cd client
-            npm install
-            unzip -o build.zip -d .
-            sudo cp -r build/* /var/www/html/
-            pm2 restart frontend || pm2 start --name frontend "npx serve -s /var/www/html -l 3000"
+            npm ci
+            npm run build
+            pm2 restart guest-frontend \
+              || pm2 start serve --name guest-frontend -- -s build -l 3000
+            pm2 save
