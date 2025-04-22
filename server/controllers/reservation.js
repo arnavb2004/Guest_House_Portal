@@ -268,6 +268,55 @@ export const updateRoomBookings = async (req, res) => {
   }
 };
 
+export async function withdrawApplication(req, res) {
+  console.log("Withdraw request received for ID:", req.params.id);
+  try {
+    const { id } = req.params; // Extract reservation ID from the request URL
+    let reservation = await Reservation.findById(req.params.id);
+    let user = await User.findOne({ email: reservation.guestEmail });
+    if (!reservation) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+
+    // Ensure only the guest or an admin can withdraw
+    if (req.user.email !== reservation.guestEmail && req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Not authorized to withdraw this application" });
+    }
+
+    // Prevent withdrawal if the user has an active booking
+    if (reservation.bookings.length > 0) {
+      return res.status(400).json({ message: "Cannot withdraw, room already booked" });
+    }
+    user.pendingRequest -= 1;
+    await user.save();
+    // Delete the reservation
+    // if (req.user?.email) {
+      const email = reservation.guestEmail;
+      sendVerificationEmail(
+        [email], // Sending only to the user who made the update
+        "Reservation withdrawn Request",
+        `<div>Your reservation has been withdrawn.</div><br><br>
+        <div>Guest Name: ${reservation.guestName}</div>
+        <div>Guest Email: ${reservation.guestEmail}</div>
+        <div>Number of Guests: ${reservation.numberOfGuests}</div>
+        <div>Number of Rooms: ${reservation.numberOfRooms}</div>
+        <div>Room Type: ${reservation.roomType}</div>
+        <div>Purpose: ${reservation.purpose}</div>
+        <div>Arrival Date: ${new Date(reservation.arrivalDate).toISOString().split("T")[0]}</div>
+        <div>Arrival Time: ${reservation.arrivalTime}</div>
+        <div>Departure Date: ${new Date(reservation.departureDate).toISOString().split("T")[0]}</div>
+        <div>Departure Time: ${reservation.departureTime}</div>
+        <div>Address: ${reservation.address}</div>
+        <div>Category: ${reservation.category}</div>`
+      );
+    // }
+    await Reservation.findByIdAndDelete(id);
+    res.status(200).json({ message: "Application withdrawn successfully!" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to withdraw application", error: error.message });
+  }
+};
+
 export async function getAllReservationDetails(req, res) {
   try {
     if (req.user.role !== "ADMIN") {
@@ -483,15 +532,15 @@ export async function approveReservation(req, res) {
       });
       await resUser.save();
     }
-    // const body =
-    //   "<div>Your reservation has been approved</div><br><div>Comments: " +
-    //   req.body.comments +
-    //   "</div>";
-    // sendVerificationEmail(
-    //   reservation.guestEmail,
-    //   "Reservation status updated",
-    //   body
-    // );
+    const body =
+      "<div>Your reservation has been approved</div><br><div>Comments: " +
+      req.body.comments +
+      "</div>";
+    sendVerificationEmail(
+      reservation.guestEmail,
+      "Reservation status updated",
+      body
+    );
     await reservation.save();
     res.status(200).json({ message: "Reservation Approved" });
   } catch (error) {
@@ -1145,18 +1194,20 @@ export const deleteRoom = async (req, res) => {
   try {
     const { roomId } = req.body;
 
-    const deletedRoom = await Room.findByIdAndDelete(roomId);
+    const room = await Room.findById(roomId);
+    // const deletedRoom = await Room.findByIdAndDelete(roomId);
 
-    if (!deletedRoom) {
+    if (!room) {
       return res.status(404).json({ message: "Room not found" });
     }
 
-    if (deletedRoom.bookings?.length > 0)
-      return res.status(404).json({ message: "Room is occupied" });
+    if (room.bookings?.length > 0)
+      return res.status(400).json({ message: "Room is occupied" });
 
+    await Room.findByIdAndDelete(roomId);
     res
       .status(200)
-      .json({ message: "Room deleted successfully", room: deletedRoom });
+      .json({ message: "Room deleted successfully", room: room });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

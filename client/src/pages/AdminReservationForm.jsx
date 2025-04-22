@@ -494,7 +494,7 @@ function AdminReservationForm() {
         mobile: userData.contact || "",
         department: department || prev.applicant.department || "",
         designation: designation || prev.applicant.designation || "",
-        code: userData.employeeId || userData.studentId || prev.applicant.code || "",
+        code: userData.employeeId || userData.studentId || userData.ecode || prev.applicant.code || "",
       }
     }));
     

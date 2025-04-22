@@ -122,6 +122,27 @@ const Register = () => {
                   name="contact"
                   value={credentials.contact}
                 />
+                <input
+                  placeholder="Department"
+                  className="p-2 border rounded-md text-sm h-12 w-full"
+                  onChange={handleChange}
+                  name="department"
+                  value={credentials.department}
+                />
+                <input
+                  placeholder="Designation"
+                  className="p-2 border rounded-md text-sm h-12 w-full"
+                  onChange={handleChange}
+                  name="designation"
+                  value={credentials.designation}
+                />
+                <input
+                  placeholder="Employee Code/ Entry Number"
+                  className="p-2 border rounded-md text-sm h-12 w-full"
+                  onChange={handleChange}
+                  name="ecode"
+                  value={credentials.ecode}
+                />
                 <button
                   className="border bg-black text-white w-full p-2 lg"
                   onClick={handleSubmit}

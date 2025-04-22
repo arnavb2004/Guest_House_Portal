@@ -36,6 +36,7 @@ import {
   sendReminderAll,
   removeFromList,
   updateRoomBookings,
+  withdrawApplication,
 } from "../controllers/reservation.js";
 
 const Router = express.Router();
@@ -81,6 +82,7 @@ Router.get("/aggregated-data", async (req, res) => {
     });
   }
 });
+Router.delete("/withdraw/:id", withdrawApplication);
 Router.put("/rooms/:id/update", updateRoomBookings);
 Router.put("/rooms/:id/remove", removeFromList);
 Router.post("/send-reminder-all", sendReminderAll);
