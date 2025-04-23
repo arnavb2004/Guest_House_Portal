@@ -14,6 +14,8 @@ import {
 import { GridFSBucket } from "mongodb";
 import pkg from "mongodb";
 const { ObjectId } = pkg;
+import dotenv from "dotenv";
+dotenv.config();
 
 const googleSheets = google.sheets("v4");
 const auth = new google.auth.JWT(
@@ -28,8 +30,8 @@ const spreadsheetId = `${process.env.GOOGLE_SHEET_ID}`;
 async function sendVerificationEmail(to, subject, body) {
   try {
     const info = await transporter.sendMail({
-      from: "dep.test.p04@gmail.com",
-      to: to.length > 0 ? to : "dep.test.p04@gmail.com", // list of receivers
+      from: process.env.EMAIL_USER,
+      to: to.length > 0 ? to : process.env.EMAIL_USER, // list of receivers
       subject: subject, // Subject line
       html: body, // plain text body
     });

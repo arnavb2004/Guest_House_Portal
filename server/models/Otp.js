@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import { transporter } from "../utils.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const { Schema } = mongoose;
 
@@ -22,7 +24,7 @@ const otpSchema = new Schema({
 async function sendVerificationEmail(email, otp) {
   try {
     const info = await transporter.sendMail({
-      from: "aimsportal420@gmail.com", // Match the auth.user from utils.js
+      from: process.env.EMAIL_USER, // Match the auth.user from utils.js
       to: email, // list of receivers
       subject: "OTP Verification", // Subject line
       html: `<p>Your otp for verification is ${otp}. It will expire in 5 minutes.</p>`, // plain text body
