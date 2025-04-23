@@ -1496,6 +1496,29 @@ export const checkoutReservation = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+export const checkinReservation = async (req, res) => {
+  try {
+    if (req.user.role !== "CASHIER")
+      return res
+        .status(403)
+        .json({ message: "You are not authorized to perform this action" });
+
+    const { id } = req.params;
+    const reservation = await Reservation.findById(id);
+    const now = new Date();
+
+    reservation.checkedIn = true;
+    reservation.arrivalDate = now;
+    // await appendReservationToSheetAfterCheckout(reservation);
+    await reservation.save();
+    console.log("check res:", reservation);
+    res.status(200).json({ message: "Checkin successful" });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 export const checkoutToday = async (req, res) => {
   try {
     const todayStart = new Date();

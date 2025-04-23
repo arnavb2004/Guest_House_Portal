@@ -139,6 +139,10 @@ const reservationSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    checkedIn: {
+      type: Boolean,
+      default: false,
+    },
     applicant: {
       name: {
         type: String,

@@ -37,6 +37,7 @@ import {
   removeFromList,
   updateRoomBookings,
   withdrawApplication,
+  checkinReservation,
 } from "../controllers/reservation.js";
 
 const Router = express.Router();
@@ -101,6 +102,7 @@ Router.get("/payment/pending", getPaymentPendingReservations);
 Router.get("/checkout/today", checkoutToday);
 Router.get("/:id", getReservationDetails);
 
+Router.put("/checkin/:id", checkinReservation);
 Router.put("/checkout/:id", checkoutReservation);
 Router.put("/rooms/:id", updateRooms);
 Router.put("/approve/:id", approveReservation);

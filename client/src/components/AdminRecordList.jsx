@@ -466,7 +466,7 @@ export default function AdminRecordList({ status = "pending" }) {
       >
         <div className="font-semibold border-b-2 text-[1.13vw] w-full" key="#">
           <div className="p-1 px-4 flex items-center w-full">
-            <div className="flex items-center gap-2 w-[15%]">
+            <div className="flex items-center gap-2 w-[15%] ">
               <Checkbox
                 edge="start"
                 color="secondary"
@@ -548,8 +548,8 @@ export default function AdminRecordList({ status = "pending" }) {
                   <div className="w-[11%] text-center">{getDate(record.departureDate)}</div>
                   <div className="w-[11%] text-center">{record.roomType}</div>
                   <div className="w-[13%] text-center">
-                  {record.bookings?.length === record.numberOfRooms&& <div className="w-[10%]">Yes</div>}
-                  {record.bookings?.length !== record.numberOfRooms && <div className="w-[10%]">No</div>}
+                  {record.bookings?.length === record.numberOfRooms&& <div className="w-[70%]">Yes</div>}
+                  {record.bookings?.length !== record.numberOfRooms && <div className="w-[70%]">No</div>}
                   </div>
                   <div className="flex justify-end items-center w-[15%] gap-3 pr-2">
                     <IconButton size="small">

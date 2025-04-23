@@ -8,7 +8,7 @@ import { getDate, getTime } from "../utils/handleDate";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { IconButton } from "@mui/material";
 import { toast } from "react-toastify";
-
+import LoginIcon from "@mui/icons-material/Login";
 
 
 export default function RecordPage() {
@@ -94,7 +94,7 @@ export default function RecordPage() {
 
   return (
     <>
-    {userRecord && (
+    {userRecord && userRecord.role=="User" && (
 
 <div className="flex justify-center py-5">
 
@@ -223,6 +223,30 @@ export default function RecordPage() {
           <div className="flex justify-between px-32 pb-5">
             <p className="p-0 text-xl font-semibold">Total Amount:</p>
             <p className="p-0 text-lg">Rs. {userRecord.payment.amount + totalDiningFare}/- only</p>
+          </div>
+          <div className="flex justify-between px-32 pb-5">
+          {user.role === "CASHIER" &&
+              userRecord.checkedIn === false && userRecord.numberOfRooms <= userRecord.bookings.length && <p className="p-0 text-xl font-semibold">checkIn user:</p> }
+            {user.role === "CASHIER" &&
+              userRecord.checkedIn == false && userRecord.numberOfRooms <= userRecord.bookings.length&&  (
+                <IconButton>
+                  <LoginIcon
+                    onClick={async () => {
+                      try {
+                        const res = await http.put(
+                          "/reservation/checkin/" + userRecord._id
+                        );
+                        toast.success("Checked in successfully");
+                        window.location.reload();
+                      } catch (error) {
+                        console.log(error);
+                        toast.error(error.response?.data?.message);
+                      }
+                    }}
+                    color="black"
+                  />
+                </IconButton>
+              )}
           </div>
           <div className="flex justify-between px-32 pb-5">
           {user.role === "CASHIER" &&
