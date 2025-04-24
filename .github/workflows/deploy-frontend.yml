@@ -35,11 +35,6 @@ jobs:
           echo "Has FRONTEND_USER: ${{ secrets.FRONTEND_USER != '' }}"
           echo "Has FRONTEND_KEY: ${{ secrets.FRONTEND_KEY != '' }}"
 
-      - name: Add VM to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.FRONTEND_HOST }} >> ~/.ssh/known_hosts
-
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@master
         with:
