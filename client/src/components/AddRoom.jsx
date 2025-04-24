@@ -10,14 +10,11 @@ import Modal from "@mui/material/Modal";
 import CloseIcon from "@mui/icons-material/Close";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
-import IconButton from '@mui/material/IconButton';
-import DeleteIcon from '@mui/icons-material/Delete';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
-
+import IconButton from "@mui/material/IconButton";
+import DeleteIcon from "@mui/icons-material/Delete";
+import MenuItem from "@mui/material/MenuItem";
+import FormControl from "@mui/material/FormControl";
+import { useNavigate } from "react-router-dom"
 
 const style = {
 	position: "absolute",
@@ -36,29 +33,24 @@ const style = {
 
 export default function AddRoom() {
 	const [rooms, setRooms] = useState([]);
-	const [hoverOverRoom, setHoverOverRoom] = useState([]);
+	const [hoverOverRoom, setHoverOverRoom] = useState();
 	const [open, setOpen] = useState(false);
 	const [roomNumber, setRoomNumber] = useState("");
-	const [confirmOpen, setConfirmOpen] = useState(false);
-	const [roomToDelete, setRoomToDelete] = useState(null);
+	const [roomType, setRoomType] = useState("");
 
 	const user = useSelector((state) => state.user);
 	const http = privateRequest(user.accessToken, user.refreshToken);
+	const navigate = useNavigate();
 
 	const fetchRooms = async () => {
 		try {
 			const res = await http.get("/reservation/rooms");
-			const currentDate = new Date();
-
-			// Filter rooms based on the latest booking end date
 			const updatedRooms = res.data.map((room) => {
+				const currentDate = new Date();
 				if (room.bookings.length > 0) {
-					// Sort bookings by endDate
 					room.bookings.sort(
 						(a, b) => new Date(a.endDate) - new Date(b.endDate)
 					);
-
-					// Check if the last booking's end date has passed
 					const lastBooking = room.bookings[room.bookings.length - 1];
 					if (new Date(lastBooking.endDate) < currentDate) {
 						room.bookings = []; // Mark room as available
@@ -66,91 +58,43 @@ export default function AddRoom() {
 				}
 				return room;
 			});
-
 			setRooms(updatedRooms);
 		} catch (error) {
-			if (error.response?.data?.message) {
-				toast.error(error.response.data.message);
-			} else {
-				toast.error("Failed to fetch rooms");
-			}
+			toast.error(error.response?.data?.message || "Failed to fetch rooms");
 		}
-	};
-	
-	const handleHoverOverRoom = (index, isHovering) => {
-		setHoverOverRoom((prevState) =>
-			prevState.map((value, i) => (i === index ? isHovering : value))
-		);
 	};
 
 	const addRoom = async () => {
-		// Check if the room number already exists
-		const roomExists = rooms.some(room => room.roomNumber === parseInt(roomNumber));
-
+		const roomExists = rooms.some((room) => room.roomNumber === parseInt(roomNumber));
 		if (roomExists) {
 			toast.error("Room with this number already exists");
-		} else {
-			try {
-				const response = await http.post("/reservation/rooms", {
-					roomNumber: roomNumber
-				});
-
-				const newRoom = response.data.room;
-
-				let flag = true;
-
-				// Update the rooms state to include the new room
-				let updateRooms = [...rooms, newRoom];
-				updateRooms.sort((a, b) => a.roomNumber - b.roomNumber);
-
-				setRooms(updateRooms);
-
-				toast.success(response.data.message);
-
-				setRoomNumber("");
-				setOpen(false);
-			} catch (error) {
-				if (error.response?.data?.message) {
-					toast.error(error.response.data.message);
-				} else {
-					toast.error("Failed to add room");
-				}
-			}
-		}
-	};
-
-	const handleDeleteRoom = (room) => {
-		if (room.bookings.length > 0) {
-			toast.error("This room is occupied. Please deallocate the room first.");
 			return;
 		}
-		setRoomToDelete(room);
-		setConfirmOpen(true);
+		try {
+			const response = await http.post("/reservation/rooms", {
+				roomNumber,
+				roomType
+			});
+			const newRoom = response.data.room;
+			const updatedRooms = [...rooms, newRoom].sort((a, b) => a.roomNumber - b.roomNumber);
+			setRooms(updatedRooms);
+			toast.success(response.data.message);
+			setRoomNumber("");
+			setOpen(false);
+		} catch (error) {
+			toast.error(error.response?.data?.message || "Failed to add room");
+		}
 	};
 
-	const confirmDeleteRoom = async () => {
-		if (!roomToDelete) return;
+	const deleteRoom = async (roomId) => {
 		try {
 			const response = await http.delete("/reservation/rooms", {
-				data: { roomId: roomToDelete._id }
+				data: { roomId }
 			});
-
-			const newRoom = response.data.room;
-
-			const updateRooms = rooms.filter((room) => room._id !== newRoom._id);
-
-			setRooms(updateRooms);
-
-			toast.success("Room deleted successfully");
+			setRooms(rooms.filter((room) => room._id !== roomId));
+			toast.success(response.data.message);
 		} catch (error) {
-			if (error.response?.data?.message) {
-				toast.error(error.response.data.message);
-			} else {
-				toast.error("Failed to delete room");
-			}
-		} finally {
-			setConfirmOpen(false);
-			setRoomToDelete(null);
+			toast.error(error.response?.data?.message || "Failed to delete room");
 		}
 	};
 
@@ -162,117 +106,123 @@ export default function AddRoom() {
 	}, []);
 
 	useEffect(() => {
-		const temp = rooms.map(() => false);
-		setHoverOverRoom(temp);
+		setHoverOverRoom(Array(rooms.length).fill(false));
 	}, [rooms]);
 
+	const groupedRooms = rooms.reduce((acc, room) => {
+		if (!acc[room.roomType]) acc[room.roomType] = [];
+		acc[room.roomType].push(room);
+		return acc;
+	}, {});
+
 	return (
-		<div className="flex flex-col just start mt-5 gap-6">
-			<div
-				className="mt-5"
-				style={{
-					display: "grid",
-					gridTemplateColumns: `repeat(auto-fill, minmax(200px, 1fr))`,
-					gridGap: "20px",
-				}}>
-				{rooms.length > 0 && rooms.map((room, index) => (
-					<div
-						key={room._id}
-						className={`relative ${room.bookings.length > 0
-								? "booked-during-range rounded-lg bg-[rgb(191,190,190)] text-white"
-								: "available border-[3px] border-green-500 rounded-lg"
-							}`}
-						onMouseOver={() => handleHoverOverRoom(index, true)}
-						onMouseOut={() => handleHoverOverRoom(index, false)}>
-						<div className="p-5 transition duration-300 ease">
-							<h3>{room.roomNumber}</h3>
-							{room.bookings.length > 0 && (
+		<div className="flex flex-col mt-5 gap-6">
+			{Object.keys(groupedRooms).length > 0 ? (
+				Object.keys(groupedRooms).map((type) => (
+					<div key={type} className="mb-6">
+						<h2 className="text-xl font-semibold text-center mb-4">{type}</h2>
+						<div className="grid grid-cols-5 gap-4">
+							{groupedRooms[type].map((room, index) => (
 								<div
-									className={`booking-info overflow-y-auto max-h-48 hidden bg-black bg-opacity-80 text-white p-2.5 rounded absolute top-full  left-0 w-full transition-opacity duration-300 ease z-50 ${hoverOverRoom[index] ? "room-booking-info-visible" : ""
-										}`}>
-									{room.bookings.toReversed().map((booking) => (
-										<div key={"info-" + room.roomNumber} className="py-1">
-											<p>
-												Booked from: {getDate(booking.startDate)} to{" "}
-												{getDate(booking.endDate)}
-											</p>
-											<p>User: {booking.user}</p>
-										</div>
-									))}
-								</div>
-							)}
-						</div>
-						{hoverOverRoom[index] && (
-							<div
-								className="absolute inset-0 bg-white bg-opacity-5 backdrop-blur-sm flex items-center justify-center"
-							>
-								<IconButton
-									aria-label="delete room"
-									onClick={() => handleDeleteRoom(room)}
+									key={room._id}
+									className={`relative p-5 rounded-lg ${
+										room.bookings.some(
+											(booking) => new Date(booking.startDate) <= new Date() && new Date(booking.endDate) >= new Date()
+										) 
+											  ? "booked-during-range rounded-lg bg-[rgb(191,190,190)] text-white"
+                            : "available border-[3px] border-green-500 rounded-lg"
+									}`}
+									
+									onMouseOver={() => setHoverOverRoom(room._id)}
+									onMouseOut={() => setHoverOverRoom(false)}
 								>
-									<DeleteIcon />
-								</IconButton>
-							</div>
-						)}
+									<h3>Room {room.roomNumber}</h3>
+									{room.bookings.some(
+											(booking) => new Date(booking.startDate) <= new Date() && new Date(booking.endDate) >= new Date()
+										)  && (
+											<div className="booking-info">
+												{room.bookings
+													.filter(
+														(booking) =>
+															new Date(booking.startDate) <= new Date() &&
+															new Date(booking.endDate) >= new Date()
+													)
+													.toReversed()
+													.map((booking) => (
+														<div key={"info-" + room.roomNumber} className="py-1">
+															<p>
+																Booked from: {getDate(booking.startDate)} to{" "}
+																{getDate(booking.endDate)}
+															</p>
+															<p>User: {booking.user}</p>
+														</div>
+													))}
+											</div>
+										)}
+									{hoverOverRoom === room._id&& (
+										<div className="absolute inset-0 bg-white bg-opacity-5 backdrop-blur-sm flex items-center justify-center">
+											<IconButton aria-label="delete room" onClick={() => deleteRoom(room._id)}>
+												<DeleteIcon />
+											</IconButton>
+										</div>
+									)}
+								</div>
+							))}
+						</div>
 					</div>
-				))}
-			</div>
-			{rooms.length === 0 &&
-				<div className="mt-5 font-semibold text-xl flex justify-center w-full">
-					Loading...
+				))
+			) : (
+				<div className="text-center text-lg font-semibold">Loading...</div>
+			)}
+
+			{rooms.length >= 0 && (
+				<div className="flex flex-col items-center gap-4">
+					<button
+						className="bg-blue-500 text-white text-lg font-semibold rounded-lg w-32 p-2 hover:bg-blue-600"
+						onClick={handleOpen}
+					>
+						Add Room
+					</button>
+
+					<button
+						className="px-4 py-2 bg-blue-500 text-white text-lg font-semibold rounded-lg w-32 hover:bg-blue-600"
+						onClick={() => navigate("/admin/reservation/room-details")}
+					>
+						Room Details
+					</button>
 				</div>
-			}
-			{rooms.length > 0 && <div className="w-full flex justify-center items-center">
-				<button
-					className="bg-blue-500 text-white text-lg font-semibold rounded-lg w-32 p-2 text-center hover:bg-blue-600"
-					onClick={handleOpen}>
-					Add Room
-				</button>
-			</div>}
-			<Modal
-				open={open}
-				onClose={handleClose}
-				aria-labelledby="modal-modal-title"
-				aria-describedby="modal-modal-description">
+			)}
+
+			<Modal open={open} onClose={handleClose}>
 				<Box sx={style}>
 					<div className="flex justify-between w-full">
-						<div className="font-semibold text-lg ml-2">
-							Room Details
-						</div>
+						<h3 className="text-lg font-semibold">Room Details</h3>
 						<CloseIcon onClick={handleClose} style={{ cursor: "pointer" }} />
 					</div>
-					<div className="w-full flex justify-center">
+					<TextField
+						label="Room Number"
+						value={roomNumber}
+						onChange={(e) => setRoomNumber(e.target.value)}
+						className="w-full"
+					/>
+					<FormControl className="w-full">
 						<TextField
-							label="Room Number"
-							value={roomNumber}
-							onChange={(e) => setRoomNumber(e.target.value)}
+							select
+							label="Room Type"
+							value={roomType}
+							onChange={(e) => setRoomType(e.target.value)}
 							className="w-full"
-						/>
-					</div>
-					<div className="w-full flex justify-center">
-						<Button variant="contained" onClick={addRoom}>Add Room</Button>
-					</div>
+						>
+							<MenuItem value="" disabled>Select Room Type</MenuItem>
+							<MenuItem value="Single Suite Room">Single Suite Room</MenuItem>
+							<MenuItem value="Double Suite Room">Double Suite Room</MenuItem>
+							<MenuItem value="Single executive Room">Single executive Room</MenuItem>
+							<MenuItem value="Double executive Room">Double executive Room</MenuItem>
+						</TextField>
+					</FormControl>
+					<Button variant="contained" onClick={addRoom}>Add Room</Button>
 				</Box>
 			</Modal>
-			<Dialog
-				open={confirmOpen}
-				onClose={() => setConfirmOpen(false)}
-			>
-				<DialogTitle>{"Confirm Deletion"}</DialogTitle>
-				<DialogContent>
-					<DialogContentText>
-						Are you sure you want to delete this room?
-					</DialogContentText>
-				</DialogContent>
-				<DialogActions>
-					<Button onClick={() => setConfirmOpen(false)} color="primary">
-						Cancel
-					</Button>
-					<Button onClick={confirmDeleteRoom} color="primary" autoFocus>
-						Delete
-					</Button>
-				</DialogActions>
-			</Dialog>
 		</div>
 	);
 }

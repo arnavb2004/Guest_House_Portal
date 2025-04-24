@@ -24,6 +24,10 @@ const UserProfileDialog = ({ openDialog, setOpenDialog }) => {
   const user = useSelector((state) => state.user);
   const [editableName, setEditableName] = useState(user.name);
   const [editableContact, setEditableContact] = useState(user.contact || "");
+  const [editableDepartment, setEditableDepartment] = useState(user.department || "");
+  const [editableDesignation, setEditableDesignation] = useState(user.designation || "");
+  const [editableEcode, setEditableEcode] = useState(user.ecode || "");
+
   const [isEditing, setIsEditing] = useState(false);
   const dispatch = useDispatch();
 
@@ -31,16 +35,20 @@ const UserProfileDialog = ({ openDialog, setOpenDialog }) => {
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
+    window.location.reload();
   };
 
   const handleUpdateUserDetails = async () => {
     dispatch(
-      updateUserDetails({ name: editableName, contact: editableContact })
+      updateUserDetails({ name: editableName, contact: editableContact, department: editableDepartment, designation : editableDesignation, ecode : editableEcode })
     );
     try {
       await http.put(`/user/${user.id}`, {
         name: editableName,
         contact: editableContact,
+        department : editableDepartment,
+        designation : editableDesignation,
+        ecode : editableEcode,
       });
     } catch (error) {
       if (error.response?.data?.message) {
@@ -52,6 +60,7 @@ const UserProfileDialog = ({ openDialog, setOpenDialog }) => {
 
     setIsEditing(false); // Exit editing mode after updating
     setOpenDialog(false);
+    window.location.reload();
   };
 
   const handleEnableEditing = () => {
@@ -116,6 +125,57 @@ const UserProfileDialog = ({ openDialog, setOpenDialog }) => {
                   ),
                 }}
               />
+              <TextField
+                margin="dense"
+                id="department"
+                label="Department"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={editableDepartment}
+                onChange={(e) => setEditableDepartment(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <ListItemIcon>
+                      <PersonIcon />
+                    </ListItemIcon>
+                  ),
+                }}
+              />
+              <TextField
+                margin="dense"
+                id="deignation"
+                label="Designation"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={editableDesignation}
+                onChange={(e) => setEditableDesignation(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <ListItemIcon>
+                      <PersonIcon />
+                    </ListItemIcon>
+                  ),
+                }}
+              />
+              <TextField
+                margin="dense"
+                id="ecode"
+                label="Employee Code/ Entry Number"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={editableEcode}
+                onChange={(e) => setEditableEcode(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <ListItemIcon>
+                      <PersonIcon />
+                    </ListItemIcon>
+                  ),
+                }}
+              />
             </>
           ) : (
             <DialogContent>
@@ -166,6 +226,57 @@ const UserProfileDialog = ({ openDialog, setOpenDialog }) => {
                   startAdornment: (
                     <ListItemIcon>
                       <ContactPhoneIcon />
+                    </ListItemIcon>
+                  ),
+                }}
+              />
+              <TextField
+                margin="dense"
+                id="department"
+                label="Department"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={user.department}
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: (
+                    <ListItemIcon>
+                      <PersonIcon />
+                    </ListItemIcon>
+                  ),
+                }}
+              />
+              <TextField
+                margin="dense"
+                id="deignation"
+                label="Designation"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={user.designation}
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: (
+                    <ListItemIcon>
+                      <PersonIcon />
+                    </ListItemIcon>
+                  ),
+                }}
+              />
+              <TextField
+                margin="dense"
+                id="ecode"
+                label="Employee Code/ Entry Number"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={user.ecode}
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: (
+                    <ListItemIcon>
+                      <PersonIcon />
                     </ListItemIcon>
                   ),
                 }}

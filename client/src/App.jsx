@@ -22,6 +22,9 @@ import RoomBooking from "./pages/RoomBooking";
 import AdminRecordPage from "./pages/AdminRecordPage";
 import AddRoom from "./components/AddRoom";
 import AdminReservationForm from "./pages/AdminReservationForm";
+import RoomDataList from "./pages/RoomDataList";
+import MonthlyReport from "./pages/MonthlyReport";
+import EditReservationForm from "./pages/Edit_ReservationForm";
 
 function App() {
   return (
@@ -45,8 +48,8 @@ function App() {
               <Route path="pending-requests" element={<AdminRecordList />} />
               <Route path="reservation-form" element={<AdminReservationForm />} />
               <Route path="process_data" element={<VisualizeData/>} />
-
-
+              <Route path="room-details" element={<RoomDataList />} />
+              <Route path="monthly-report" element={<MonthlyReport />} />
               <Route path="users" element={<UserList />} />
               <Route path="rooms" element={<AddRoom />} />
               <Route path=":id/rooms" element={<RoomBooking />} />
@@ -87,6 +90,7 @@ function App() {
                 element={<RecordList status="rejected" />}
               />
               <Route path="reservation-form" element={<ReservationForm />} />
+              <Route path="edit-reservation/:id" element={<EditReservationForm/>} />
               <Route path=":id" element={<RecordPage />} />
             </Route>
           </Route>

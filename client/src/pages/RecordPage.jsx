@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios"; // Assuming you use axios for API requests
 import Workflow from "../components/Workflow";
 import { privateRequest } from "../utils/useFetch";
@@ -8,7 +8,7 @@ import { getDate, getTime } from "../utils/handleDate";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { IconButton } from "@mui/material";
 import { toast } from "react-toastify";
-
+import LoginIcon from "@mui/icons-material/Login";
 
 
 export default function RecordPage() {
@@ -16,7 +16,7 @@ export default function RecordPage() {
 
   const user = useSelector((state) => state.user);
   const [reviewers, setReviewers] = useState([]);
-
+  const navigate = useNavigate();
   const color = {
     PENDING: "bg-gray-400",
     APPROVED: "bg-green-400",
@@ -94,6 +94,57 @@ export default function RecordPage() {
 
   return (
     <>
+    {userRecord && userRecord.role=="User" && (
+
+<div className="flex justify-center py-5">
+
+  <button
+
+    className="px-6 py-2 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition"
+
+    onClick={async () => {
+
+      if (userRecord.bookings?.length > 0) {
+
+        return toast.error("Cannot withdraw after booking a room.");
+
+      }
+
+    
+
+      try {
+
+        console.log("id ", userRecord._id);
+
+        const response = await http.delete(`/reservation/withdraw/${userRecord._id}`);
+
+        
+
+        toast.success("Application withdrawn successfully!");
+
+        navigate("..");
+
+      } catch (error) {
+
+        console.error("Error withdrawing application:", error);
+
+        toast.error(error.message);
+
+      }
+
+    }}            
+
+  >
+
+    Withdraw Application
+
+  </button>
+
+</div>
+
+)}
+
+
       <div className="grid grid-cols-8 m-9 gap-4 md:flex">
         <Workflow
           id={id}
@@ -172,6 +223,30 @@ export default function RecordPage() {
           <div className="flex justify-between px-32 pb-5">
             <p className="p-0 text-xl font-semibold">Total Amount:</p>
             <p className="p-0 text-lg">Rs. {userRecord.payment.amount + totalDiningFare}/- only</p>
+          </div>
+          <div className="flex justify-between px-32 pb-5">
+          {user.role === "CASHIER" &&
+              userRecord.checkedIn === false && userRecord.numberOfRooms <= userRecord.bookings.length && <p className="p-0 text-xl font-semibold">checkIn user:</p> }
+            {user.role === "CASHIER" &&
+              userRecord.checkedIn == false && userRecord.numberOfRooms <= userRecord.bookings.length&&  (
+                <IconButton>
+                  <LoginIcon
+                    onClick={async () => {
+                      try {
+                        const res = await http.put(
+                          "/reservation/checkin/" + userRecord._id
+                        );
+                        toast.success("Checked in successfully");
+                        window.location.reload();
+                      } catch (error) {
+                        console.log(error);
+                        toast.error(error.response?.data?.message);
+                      }
+                    }}
+                    color="black"
+                  />
+                </IconButton>
+              )}
           </div>
           <div className="flex justify-between px-32 pb-5">
           {user.role === "CASHIER" &&

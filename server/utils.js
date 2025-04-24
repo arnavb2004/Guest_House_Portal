@@ -1,11 +1,12 @@
 import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+dotenv.config();
 
 export const transporter = nodemailer.createTransport({
   service: "gmail",
-  "port": "465",
   auth: {
-    user: "aimsportal420@gmail.com",
-    pass: "dcmsxftqpduuzwsq",
+    user: process.env.EMAIL_USER ,
+    pass: process.env.EMAIL_PASS ,
   },
 });
 
@@ -39,7 +40,7 @@ export const getTime = (dateString) => {
 export async function sendVerificationEmail(to, subject, body) {
   try {
     const info = await transporter.sendMail({
-      from: "aimsportal420@gmail.com",
+      from: process.env.EMAIL_USER, 
       to: to, // list of receivers
       subject: subject, // Subject line
       html: body, // plain text body

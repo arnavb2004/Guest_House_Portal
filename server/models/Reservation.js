@@ -105,6 +105,10 @@ const reservationSchema = new mongoose.Schema(
           type: Number,
           required: true,
         },
+        user: {
+          type: String,
+          required: true,
+        },
       },
     ],
     payment: {
@@ -132,6 +136,10 @@ const reservationSchema = new mongoose.Schema(
       },
     },
     checkOut: {
+      type: Boolean,
+      default: false,
+    },
+    checkedIn: {
       type: Boolean,
       default: false,
     },

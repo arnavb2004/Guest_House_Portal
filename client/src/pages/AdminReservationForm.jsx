@@ -82,16 +82,16 @@ function AdminReservationForm() {
     guestName: false,
     address: false,
     numberOfGuests: false,
-    numberOfRooms: false,
-    roomType: false,
+    numberOfRooms: true,
+    roomType: true,
     arrivalDate: true,
     arrivalTime: false,
     departureDate: true,
     departureTime: false,
-    purpose: false,
+    purpose: true,
     category: true,
     source: false,
-    applicant: false,
+    applicant: true,
   };
 
   const patterns = {
@@ -494,7 +494,7 @@ function AdminReservationForm() {
         mobile: userData.contact || "",
         department: department || prev.applicant.department || "",
         designation: designation || prev.applicant.designation || "",
-        code: userData.employeeId || userData.studentId || prev.applicant.code || "",
+        code: userData.employeeId || userData.studentId || userData.ecode || prev.applicant.code || "",
       }
     }));
     

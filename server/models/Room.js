@@ -5,6 +5,11 @@ const RoomSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  roomType: {
+    type: String,
+    required: true,
+    enum: ["Single Suite Room", "Double Suite Room", "Single executive Room", "Double executive Room"],
+  },
   bookings: [
     {
       startDate: {
@@ -14,6 +19,10 @@ const RoomSchema = new mongoose.Schema({
       endDate: {
         type: Date,
         required: true,
+      },
+      resid: {
+        type: String,
+        //required: true,
       },
       user: {
         type: String,
