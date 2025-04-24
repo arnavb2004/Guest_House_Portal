@@ -35,10 +35,11 @@ const valueOptions = {
     { value: "HOLD", label: "On Hold" },
   ],
   category: [
-    { value: "A", label: "Category A" },
-    { value: "B", label: "Category B" },
-    { value: "C", label: "Category C" },
-    { value: "D", label: "Category D" },
+    { value: "ES-A", label: "Executive Suite - Category A (Free)" },
+    { value: "ES-B", label: "Executive Suite - Category B (₹3500)" },
+    { value: "BR-A", label: "Business Room - Category A (Free)" },
+    { value: "BR-B1", label: "Business Room - Category B1 (₹2000)" },
+    { value: "BR-B2", label: "Business Room - Category B2 (₹1200)" },
   ],
   roomType: [
     { value: "Single Occupancy", label: "Single Occupancy" },

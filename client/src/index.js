@@ -16,8 +16,9 @@ injectStore(store);
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
-const clientId =
-  "516253965885-l50g9mqi21i2qcle027tbdth7oht3aan.apps.googleusercontent.com";
+const clientId = process.env.REACT_APP_CLIENT_ID;
+// const clientId =
+//   "516253965885-l50g9mqi21i2qcle027tbdth7oht3aan.apps.googleusercontent.com";
 
 root.render(
   <GoogleOAuthProvider clientId={clientId}>

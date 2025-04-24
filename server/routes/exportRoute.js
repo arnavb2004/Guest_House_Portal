@@ -53,11 +53,7 @@ const getAuthClient = () => {
   }
 };
 
-/**
- * @route   GET /export/all
- * @desc    Export all reservations to Google Sheets
- * @access  Private
- */
+
 router.get('/all', checkAuth, async (req, res) => {
   try {
     console.log('Starting export process...');
@@ -869,7 +865,7 @@ async function addRevenueAnalysis(sheets, spreadsheetId, sheetTitle, sheetId, he
   
   // Category breakdown if category column exists
   if (categoryIdx !== -1) {
-    const categories = options.categories || ['A', 'B', 'C', 'D'];
+    const categories = options.categories || ['ES-A', 'ES-B', 'BR-A', 'BR-B1', 'BR-B2'];
     
     // Add headers for category analysis
     await sheets.spreadsheets.values.update({
