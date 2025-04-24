@@ -28,6 +28,7 @@ store.subscribe(() => {
   });
 });
 
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 const clientId = process.env.REACT_APP_CLIENT_ID;
