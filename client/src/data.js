@@ -10,7 +10,6 @@ import food4 from "./images/pizza.jpeg";
 import food5 from "./images/pizza.jpeg";
 import food6 from "./images/pizza.jpeg";
 
-
 export const sliderItems = [
   {
     key: 1,
