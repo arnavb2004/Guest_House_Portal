@@ -35,12 +35,22 @@ jobs:
           echo "Has FRONTEND_USER: ${{ secrets.FRONTEND_USER != '' }}"
           echo "Has FRONTEND_KEY: ${{ secrets.FRONTEND_KEY != '' }}"
 
+      - name: Verify server connectivity
+        run: |
+          echo "Checking if server is reachable..."
+          timeout 10 nc -zv ${{ secrets.FRONTEND_HOST }} 22 || echo "Warning: Server not reachable on port 22, deployment might fail"
+        continue-on-error: true
+
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.FRONTEND_HOST }}
           username: ${{ secrets.FRONTEND_USER }}
           key: ${{ secrets.FRONTEND_KEY }}
+          port: 22
+          command_timeout: "20m"
+          connect_timeout: "30s"
+          script_stop: false
           script: |
             cd ~/Guest_House_Portal/client
             git pull
