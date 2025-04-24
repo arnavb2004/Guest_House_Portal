@@ -36,3 +36,5 @@ jobs:
             cd server
             npm install
             pm2 restart backend || pm2 start --name backend "node index.js"
+            pm2 restart index || echo "No index process found to restart"
+            
