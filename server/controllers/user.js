@@ -36,12 +36,45 @@ export const updateUser = async (req, res) => {
       .status(403)
       .json({ message: "You are not authorized to perform this action" });
   }
+  
   try {
-    await User.findByIdAndUpdate(req.params.id, {
-      $set: req.body,
+    console.log("Updating user profile with data:", req.body);
+    
+    // Sanitize the input data
+    const { name, contact, department, designation, ecode } = req.body;
+    
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (contact) updateData.contact = contact;
+    if (department !== undefined) updateData.department = department;
+    if (designation !== undefined) updateData.designation = designation;
+    if (ecode !== undefined) updateData.ecode = ecode;
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true } // Return updated document
+    );
+    
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    console.log("User updated successfully:", updatedUser);
+    res.status(200).json({ 
+      message: "Account has been updated",
+      user: {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        contact: updatedUser.contact,
+        department: updatedUser.department,
+        designation: updatedUser.designation,
+        ecode: updatedUser.ecode,
+        role: updatedUser.role
+      }
     });
-    res.status(200).json("Account has been updated");
   } catch (err) {
+    console.error("Error updating user:", err);
     res.status(500).json({ message: err.message });
   }
 };

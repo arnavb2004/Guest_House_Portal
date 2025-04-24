@@ -67,7 +67,11 @@ export const verifyOtp = async (req, res) => {
 export const registerUser = async (req, res) => {
   try {
     const user = req.body;
-    console.log(user);
+    console.log("Registration request with data:", user);
+    console.log("Department:", user.department);
+    console.log("Designation:", user.designation);
+    console.log("Employee Code:", user.ecode);
+    
     const email = user?.email;
     const mobile = user?.contact;
 
@@ -93,16 +97,29 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    const newUser = await User.create(user);
+    // Ensure department, designation, and ecode are saved even if empty strings
+    const userData = {
+      ...user,
+      department: user.department || "",
+      designation: user.designation || "",
+      ecode: user.ecode || ""
+    };
+
+    const newUser = await User.create(userData);
+    console.log("User saved to database:", {
+      id: newUser._id,
+      name: newUser.name,
+      department: newUser.department,
+      designation: newUser.designation,
+      ecode: newUser.ecode
+    });
+    
     const refreshToken = jwt.sign({ email }, process.env.REFRESH_TOKEN_SECRET, {
       expiresIn: "180d",
     });
     const accessToken = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
       expiresIn: "5m",
     });
-
-    console.log(newUser);
-    console.log("User saved");
     
     return res.status(200).json({
       success: true,
@@ -125,8 +142,19 @@ export const googleLoginUser = async (req, res) => {
     const { credential } = req?.body;
     const cred = jwtDecode(credential);
     const email = cred?.email;
+    console.log("Google login request for email:", email);
+    
     if (email) {
       const user = await User.findOne({ email });
+      console.log("User found in Google login:", {
+        exists: !!user,
+        id: user?._id,
+        name: user?.name,
+        department: user?.department,
+        designation: user?.designation,
+        ecode: user?.ecode
+      });
+      
       if (user) {
         const refreshToken = jwt.sign(
           { email },
@@ -144,15 +172,31 @@ export const googleLoginUser = async (req, res) => {
         );
         user.refreshToken = refreshToken;
         await user.save();
+        
+        // Make sure all fields are included in the response
+        const userData = {
+          ...user.toObject(),
+          department: user.department || "",
+          designation: user.designation || "",
+          ecode: user.ecode || ""
+        };
+        
+        console.log("Sending Google user data to client:", {
+          department: userData.department,
+          designation: userData.designation,
+          ecode: userData.ecode
+        });
+        
         res.status(200).json({
           success: true,
-          user: user,
+          user: userData,
           message: "User logged in successfully",
           hideMessage: true,
           accessToken,
           refreshToken,
         });
       } else {
+        console.log("New Google user, redirecting to registration");
         res.status(200).json({
           success: false,
           email,
@@ -173,7 +217,7 @@ export const googleLoginUser = async (req, res) => {
 
 export const loginUser = async (req, res) => {
   try {
-    console.log(req.body);
+    console.log("Login request:", req.body);
     const { email, otp } = req?.body;
 
     if (!email || !otp)
@@ -185,7 +229,14 @@ export const loginUser = async (req, res) => {
 
     if (result) {
       const user = await User.findOne({ email: email });
-      console.log("User logged in successfully");
+      console.log("User found in login:", {
+        id: user?._id,
+        name: user?.name,
+        department: user?.department,
+        designation: user?.designation,
+        ecode: user?.ecode
+      });
+      
       if (user) {
         const refreshToken = jwt.sign(
           { email },
@@ -203,9 +254,24 @@ export const loginUser = async (req, res) => {
         );
         user.refreshToken = refreshToken;
         await user.save();
+        
+        // Make sure all fields are included in the response
+        const userData = {
+          ...user.toObject(),
+          department: user.department || "",
+          designation: user.designation || "",
+          ecode: user.ecode || ""
+        };
+        
+        console.log("Sending user data to client:", {
+          department: userData.department,
+          designation: userData.designation,
+          ecode: userData.ecode
+        });
+        
         res.status(200).json({
           success: true,
-          user: user,
+          user: userData,
           message: "User logged in successfully",
           accessToken,
           refreshToken,

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { logout, updateUserDetails } from "../redux/userSlice";
+import { logout, updateUserDetails, refreshUserData } from "../redux/userSlice";
 import IconButton from "@mui/material/IconButton";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import NotificationsIcon from "@mui/icons-material/Notifications";
@@ -41,6 +41,17 @@ const Header = () => {
   };
 
   const handleOpenDialog = () => {
+    if (user?.id) {
+      try {
+        http.get(`/user/${user.id}`).then(response => {
+          if (response.data) {
+            dispatch(refreshUserData(response.data));
+          }
+        });
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    }
     setOpenDialog(true);
   };
 

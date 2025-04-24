@@ -8,14 +8,20 @@ const credentialSlice = createSlice({
     email: "",
     contact: "",
     role: "",
+    department: "",
+    designation: "",
+    ecode: ""
   },
   reducers: {
     setCredentialSlice: (state, action) => {
-      const { name, contact, role, email } = action.payload;
+      const { name, contact, role, email, department, designation, ecode } = action.payload;
       state.name = name;
       state.role = role;
       state.contact = contact;
       state.email = email;
+      state.department = department || "";
+      state.designation = designation || "";
+      state.ecode = ecode || "";
     },
   },
 });

@@ -169,7 +169,12 @@ const Login = ({ isRegister }) => {
           );
           navigate(-1);
         } else {
-          dispatch(setCredentialSlice(credentials));
+          dispatch(setCredentialSlice({
+            ...credentials,
+            department: "",
+            designation: "",
+            ecode: ""
+          }));
           // setIsLogin(false);
           navigate("/register");
         }
@@ -275,7 +280,12 @@ const Login = ({ isRegister }) => {
                       dispatch(setUserSlice(res.data));
                       navigate(-1);
                     } else {
-                      dispatch(setCredentialSlice({ email: res.data.email }));
+                      dispatch(setCredentialSlice({ 
+                        email: res.data.email,
+                        department: "",
+                        designation: "",
+                        ecode: "" 
+                      }));
                       navigate("/register");
                     }
                   } catch (error) {

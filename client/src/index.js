@@ -14,6 +14,20 @@ import { injectStore } from "./utils/httpService";
 
 injectStore(store);
 
+// Subscribe to the store to log state changes
+store.subscribe(() => {
+  const state = store.getState();
+  console.log("Redux state updated:", {
+    user: {
+      id: state.user.id,
+      name: state.user.name,
+      department: state.user.department,
+      designation: state.user.designation,
+      ecode: state.user.ecode
+    }
+  });
+});
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 const clientId = process.env.REACT_APP_CLIENT_ID;

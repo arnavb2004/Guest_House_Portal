@@ -53,6 +53,9 @@ const Register = () => {
     try {
       const res = await axios.post(BASE_URL + "/auth/register", {
         ...credentials,
+        department: credentials.department || "",
+        designation: credentials.designation || "",
+        ecode: credentials.ecode || ""
       });
 
       if (res.data.user) {
