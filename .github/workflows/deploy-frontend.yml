@@ -2,29 +2,24 @@ name: Deploy Frontend
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
     paths:
       - 'client/**'
 
 jobs:
-  build_and_deploy:
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20    # ← give the whole job up to 20m instead of the default 360m
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Use Node.js 18.x
-        uses: actions/setup-node@v2
-        with:
-          node-version: '18'
-
       - name: Build production bundle
         working-directory: ./client
         env:
           CI: false
-        timeout-minutes: 20   # ← you can also bump just this step to 20m
         run: |
           npm ci
           npm run build
@@ -35,11 +30,10 @@ jobs:
           echo "Has FRONTEND_USER: ${{ secrets.FRONTEND_USER != '' }}"
           echo "Has FRONTEND_KEY: ${{ secrets.FRONTEND_KEY != '' }}"
 
-      - name: Verify server connectivity
+      - name: Add host to known_hosts
         run: |
-          echo "Checking if server is reachable..."
-          timeout 10 nc -zv ${{ secrets.FRONTEND_HOST }} 22 || echo "Warning: Server not reachable on port 22, deployment might fail"
-        continue-on-error: true
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.FRONTEND_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@master
@@ -48,14 +42,14 @@ jobs:
           username: ${{ secrets.FRONTEND_USER }}
           key: ${{ secrets.FRONTEND_KEY }}
           port: 22
-          command_timeout: "20m"
-          connect_timeout: "30s"
-          script_stop: false
+          timeout: 20m            # overall SSH timeout
+          command_timeout: 20m    # per-command timeout
           script: |
             cd ~/Guest_House_Portal/client
-            git pull
+            git pull origin main
             npm ci
             npm run build
-            pm2 restart guest-frontend \
-              || pm2 start serve --name guest-frontend -- -s build -l 3000
+            # restart or start the pm2 process named "frontend"
+            pm2 restart frontend \
+              || pm2 start --name frontend "npx serve -s build -l 3000"
             pm2 save
