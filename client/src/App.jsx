@@ -77,6 +77,8 @@ function App() {
                 path="checkout-today"
                 element={<RecordList checkout="today" desc="checkout-today" />}
               />
+              <Route path="process_data" element={<VisualizeData/>} />
+
               <Route path=":id" element={<RecordPage />} />
             </Route>
           </Route>
