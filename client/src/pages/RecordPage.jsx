@@ -23,7 +23,12 @@ export default function RecordPage() {
     REJECTED: "bg-red-400",
     HOLD: "bg-yellow-400",
   };
-
+  const [showModal, setShowModal] = useState(false);
+  const [arrivalDateInput, setArrivalDateInput] = useState("");
+  const [arrivalTimeInput, setArrivalTimeInput] = useState("");
+  const [showModal2, setShowModal2] = useState(false);
+  const [departureDateInput, setDepartureDateInput] = useState("");
+  const [departureTimeInput, setDepartureTimeInput] = useState("");
   const http = privateRequest(user.accessToken, user.refreshToken);
 
   const [status, setStatus] = useState("Loading");
@@ -42,7 +47,35 @@ export default function RecordPage() {
     category: "",
   });
 
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); // Adjust for timezone
+    return date.toISOString().split("T")[0]; // Keep only YYYY-MM-DD
+  };
+  
+  const formatTime = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); // Adjust for timezone
+    return date.toISOString().split("T")[1].slice(0, 5); // Extract HH:MM
+  };
 
+  useEffect(() => {
+    const now = new Date();
+  const formattedDate = formatDate(now); // YYYY-MM-DD
+  const formattedTime = formatTime(now); // HH:MM
+  setArrivalDateInput(formattedDate);
+  setArrivalTimeInput(formattedTime); 
+  }, [showModal]);
+  
+  useEffect(() => {
+    const now = new Date();
+  const formattedDate = formatDate(now); // YYYY-MM-DD
+  const formattedTime = formatTime(now); // HH:MM
+  setDepartureDateInput(formattedDate);
+  setDepartureTimeInput(formattedTime); 
+  }, [showModal2]);
   const roomPricesB = { 'Single Occupancy': 600, 'Double Occupancy': 850 }
   const roomPricesC = { 'Single Occupancy': 900, 'Double Occupancy': 1250 }
   const roomPricesD = { 'Single Occupancy': 1300, 'Double Occupancy': 1800 }
@@ -231,18 +264,7 @@ export default function RecordPage() {
               userRecord.checkedIn == false && userRecord.numberOfRooms <= userRecord.bookings.length&&  (
                 <IconButton>
                   <LoginIcon
-                    onClick={async () => {
-                      try {
-                        const res = await http.put(
-                          "/reservation/checkin/" + userRecord._id
-                        );
-                        toast.success("Checked in successfully");
-                        window.location.reload();
-                      } catch (error) {
-                        console.log(error);
-                        toast.error(error.response?.data?.message);
-                      }
-                    }}
+                    onClick={() => setShowModal(true)}
                     color="black"
                   />
                 </IconButton>
@@ -257,18 +279,7 @@ export default function RecordPage() {
               !userRecord.checkOut && (
                 <IconButton>
                   <LogoutIcon
-                    onClick={async () => {
-                      try {
-                        const res = await http.put(
-                          "/reservation/checkout/" + userRecord._id
-                        );
-                        toast.success("Checked out successfully");
-                        window.location.reload();
-                      } catch (error) {
-                        console.log(error);
-                        toast.error(error.response?.data?.message);
-                      }
-                    }}
+                    onClick={() => setShowModal2(true)}
                     color="black"
                   />
                 </IconButton>
@@ -329,6 +340,124 @@ export default function RecordPage() {
 
         </div>
       </div> */}
+      {showModal && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+    <div className="bg-white rounded-lg p-6 w-96 flex flex-col gap-4">
+      <h2 className="text-xl font-semibold mb-4">Enter Arrival Date and Time</h2>
+
+      <input
+        type="date"
+        value={arrivalDateInput}
+        onChange={(e) => setArrivalDateInput(e.target.value)}
+        className="border p-2 rounded"
+      />
+      <input
+        type="time"
+        value={arrivalTimeInput}
+        onChange={(e) => setArrivalTimeInput(e.target.value)}
+        className="border p-2 rounded"
+      />
+
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+          onClick={() => setShowModal(false)}
+        >
+          Cancel
+        </button>
+        <button
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={async () => {
+            if (!arrivalDateInput || !arrivalTimeInput) {
+              return toast.error("Please select both date and time");
+            }
+
+            try {
+              const arrivalDateTime = new Date(
+                `${arrivalDateInput}T${arrivalTimeInput}`
+              );
+
+              const res = await http.put(
+                `/reservation/checkin/${userRecord._id}`,
+                {
+                  arrivalDate: arrivalDateTime, // sending in request body
+                }
+              );
+
+              toast.success("Checked in successfully");
+              setShowModal(false);
+              window.location.reload();
+            } catch (error) {
+              console.log(error);
+              toast.error(error.response?.data?.message || "Check-In failed");
+            }
+          }}
+        >
+          Submit
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{showModal2 && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+    <div className="bg-white rounded-lg p-6 w-96 flex flex-col gap-4">
+      <h2 className="text-xl font-semibold mb-4">Enter Departure Date and Time</h2>
+
+      <input
+        type="date"
+        value={departureDateInput}
+        onChange={(e) => setDepartureDateInput(e.target.value)}
+        className="border p-2 rounded"
+      />
+      <input
+        type="time"
+        value={departureTimeInput}
+        onChange={(e) => setDepartureTimeInput(e.target.value)}
+        className="border p-2 rounded"
+      />
+
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+          onClick={() => setShowModal2(false)}
+        >
+          Cancel
+        </button>
+        <button
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={async () => {
+            if (!departureDateInput || !departureTimeInput) {
+              return toast.error("Please select both date and time");
+            }
+
+            try {
+              const departureDateTime = new Date(
+                `${departureDateInput}T${departureTimeInput}`
+              );
+              const res = await http.put(
+                `/reservation/checkout/${userRecord._id}`,
+                {
+                  departureDate: departureDateTime, // sending in request body
+                }
+              );
+
+              toast.success("Checked out successfully");
+              setShowModal2(false);
+              window.location.reload();
+            } catch (error) {
+              console.log(error);
+              toast.error(error.response?.data?.message || "Check-Out failed");
+            }
+          }}
+        >
+          Submit
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </>
   );
 }
