@@ -126,23 +126,141 @@ export async function createReservation(req, res) {
     console.log("Subroles:", subroles);
     
     let subrolesArray = subroles ? subroles.split(",") : [];
-    let reviewersArray = reviewers ? reviewers.split(",").map((role, index) => ({
-      role:
-        role +
-        (subrolesArray[index] && subrolesArray[index] !== "Select" ? " " + subrolesArray[index] : ""),
-      comments: "",
-      status: "PENDING",
-    })) : [];
-
+    let reviewersArray = reviewers ? reviewers.split(",").map((role, index) => {
+      console.log(`Processing reviewer: '${role}'`);
+      return {
+        role: role.trim(), // Make sure to trim any whitespace
+        comments: "",
+        status: "PENDING",
+      };
+    }) : [];
+    
+    console.log("Final reviewers array:", reviewersArray.map(r => r.role));
+    
+    // Validate category-specific approval requirements
+    const catESAReviewers = ["DIRECTOR", "DEAN RESEARCH AND DEVELOPMENT", "DEAN STUDENT AFFAIRS", "DEAN FACULTY AFFAIRS AND ADMINISTRATION", "DEAN UNDER GRADUATE STUDIES", "DEAN POST GRADUATE STUDIES"];
+    const catESBReviewers = ["CHAIRMAN"];
+    const catBRAValidOptions = [
+      ["DIRECTOR"], // Option 1: Director alone
+      ["REGISTRAR"], // Option 2: Registrar alone
+      // Option 3: Any Dean + Any Associate Dean (validated in the validation logic)
+    ];
+    const catBRB1PrimaryOptions = ["DEAN RESEARCH AND DEVELOPMENT", "DEAN STUDENT AFFAIRS", "DEAN FACULTY AFFAIRS AND ADMINISTRATION", "DEAN UNDER GRADUATE STUDIES", "DEAN POST GRADUATE STUDIES"];
+    const catBRB1SecondaryOptions = ["REGISTRAR", "ASSOCIATE DEAN HOSTEL MANAGEMENT", "ASSOCIATE DEAN INTERNATIONAL RELATIONS AND ALUMNI AFFAIRS", "ASSOCIATE DEAN CONTINUING EDUCATION AND OUTREACH ACTIVITIES", "ASSOCIATE DEAN INFRASTRUCTURE", "HOD COMPUTER SCIENCE", "HOD ELECTRICAL ENGINEERING", "HOD MECHANICAL ENGINEERING", "HOD CHEMISTRY", "HOD MATHEMATICS", "HOD PHYSICS", "HOD HUMANITIES AND SOCIAL SCIENCES", "HOD BIOMEDICAL ENGINEERING", "HOD CHEMICAL ENGINEERING", "HOD METALLURGICAL AND MATERIALS ENGINEERING", "HOD CIVIL ENGINEERING"];
+    const catBRB2Reviewers = ["CHAIRMAN"];
+    
+    // Validate reviewers based on category if user is not admin
+    if (req.user.role !== "ADMIN") {
+      // This validation would typically be done on the frontend, but it's good to have backend validation too
+      let validationPassed = true;
+      let validationMessage = "";
+      
+      const reviewerRoles = reviewersArray.map(r => r.role);
+      
+      switch(category) {
+        case "ES-A":
+          // ES-A: Director or any Dean
+          if (reviewerRoles.length !== 1 || !catESAReviewers.includes(reviewerRoles[0])) {
+            validationPassed = false;
+            validationMessage = "For ES-A category, only Director or a Dean can be approving authority";
+          }
+          break;
+          
+        case "ES-B":
+          // ES-B: Chairman only
+          if (reviewerRoles.length !== 1 || reviewerRoles[0] !== "CHAIRMAN") {
+            validationPassed = false;
+            validationMessage = "For ES-B category, only Chairman can be approving authority";
+          }
+          break;
+          
+        case "BR-A":
+          // BR-A: Either (1) Director alone OR (2) Registrar alone OR (3) Dean + Associate Dean
+          if (reviewerRoles.length === 1) {
+            // Case 1 & 2: Director alone or Registrar alone is valid
+            if (reviewerRoles[0] !== "DIRECTOR" && reviewerRoles[0] !== "REGISTRAR" && !reviewerRoles[0].startsWith("DEAN ")) {
+              validationPassed = false;
+              validationMessage = "For BR-A single authority, must be Director, Registrar, or a Dean";
+            }
+          } else if (reviewerRoles.length === 2) {
+            // Case 3: Primary (Dean) + Secondary (Associate Dean)
+            const primaryIsDean = reviewerRoles[0].startsWith("DEAN ");
+            const secondaryIsAssociateDean = reviewerRoles[1].startsWith("ASSOCIATE DEAN ");
+            
+            if (!primaryIsDean || !secondaryIsAssociateDean) {
+              // Also check the other way around - sometimes order might vary
+              const altPrimaryIsAssociateDean = reviewerRoles[0].startsWith("ASSOCIATE DEAN ");
+              const altSecondaryIsDean = reviewerRoles[1].startsWith("DEAN ");
+              
+              if (!(altPrimaryIsAssociateDean && altSecondaryIsDean)) {
+                validationPassed = false;
+                validationMessage = "For BR-A with two authorities, must be a Dean and an Associate Dean";
+              }
+            }
+          } else {
+            validationPassed = false;
+            validationMessage = "For BR-A, select either Director alone, Registrar alone, or a Dean with an Associate Dean";
+          }
+          break;
+          
+        case "BR-B1":
+          // BR-B1: Dean + (Associate Dean, HOD, or Registrar)
+          if (reviewerRoles.length !== 2) {
+            validationPassed = false;
+            validationMessage = "BR-B1 requires two approving authorities";
+          } else {
+            const hasDean = reviewerRoles[0].startsWith("DEAN ") && !reviewerRoles[0].startsWith("ASSOCIATE");
+            if (!hasDean) {
+              validationPassed = false;
+              validationMessage = "For BR-B1, primary must be a Dean";
+            }
+            
+            const validSecondary = reviewerRoles[1].startsWith("ASSOCIATE DEAN ") || 
+                                reviewerRoles[1].startsWith("HOD ") || 
+                                reviewerRoles[1] === "REGISTRAR";
+            if (!validSecondary) {
+              validationPassed = false;
+              validationMessage = "For BR-B1, secondary must be Associate Dean, HOD, or Registrar";
+            }
+          }
+          break;
+          
+        case "BR-B2":
+          // BR-B2: Chairman only
+          if (reviewerRoles.length !== 1 || reviewerRoles[0] !== "CHAIRMAN") {
+            validationPassed = false;
+            validationMessage = "For BR-B2 category, only Chairman can be approving authority";
+          }
+          break;
+      }
+      
+      if (!validationPassed) {
+        return res.status(400).json({ message: validationMessage });
+      }
+    }
+    
+    // Always add ADMIN as a reviewer for all reservations
+    if (req.user.role !== "ADMIN") {
+      reviewersArray.unshift({ role: "ADMIN", comments: "", status: "PENDING" });
+    }
+    
     if (req.user.role === "ADMIN") {
       // First, add ADMIN as a reviewer
       if(guestName === "") guestName = "ADMIN";
       reviewersArray = [{ role: "ADMIN", comments: "", status: "PENDING" }];
       
-      // For specific categories, add CHAIRMAN as a reviewer too
-      if (category === "ES-B" || category === "BR-A" || category === "BR-B1" || 
-          category === "BR-B2") {
-        reviewersArray.push({ role: "CHAIRMAN", comments: "", status: "PENDING" });
+      // Preserve the user-selected reviewers if admin is creating the reservation
+      if (reviewers) {
+        const userSelectedReviewers = reviewers.split(",").map((role, index) => ({
+          role:
+            role +
+            (subrolesArray[index] && subrolesArray[index] !== "Select" ? " " + subrolesArray[index] : ""),
+          comments: "",
+          status: "PENDING",
+        }));
+        
+        // Add all user-selected reviewers
+        reviewersArray.push(...userSelectedReviewers);
       }
     }
    
@@ -458,7 +576,7 @@ export async function approveReservation(req, res) {
     let reservation = await Reservation.findById(req.params.id);
     if (
       req.user.role !== "ADMIN" &&
-      !reservation.reviewers.find((r) => r.role === req.user.role)
+      !reservation.reviewers.some((r) => r.role.includes(req.user.role))
     ) {
       return res
         .status(403)
@@ -477,7 +595,7 @@ export async function approveReservation(req, res) {
     }
     
     reservation.reviewers = reservation.reviewers.map((reviewer) => {
-      if (reviewer.role === req.user.role) {
+      if (reviewer.role.includes(req.user.role)) {
         found = true;
         reviewer.status = "APPROVED";
         if (req.body.comments) reviewer.comments = req.body.comments;
@@ -555,7 +673,7 @@ export async function rejectReservation(req, res) {
     let reservation = await Reservation.findById(req.params.id);
     if (
       req.user.role !== "ADMIN" &&
-      !reservation.reviewers.find((r) => r.role === req.user.role)
+      !reservation.reviewers.some((r) => r.role.includes(req.user.role))
     ) {
       return res
         .status(403)
@@ -563,7 +681,7 @@ export async function rejectReservation(req, res) {
     }
     let found = false;
     reservation.reviewers = reservation.reviewers.map((reviewer) => {
-      if (reviewer.role === req.user.role) {
+      if (reviewer.role.includes(req.user.role)) {
         found = true;
         reviewer.status = "REJECTED";
         reviewer.comments = `Rejection Reason: ${req.body.reason || "No reason provided"}`;
@@ -605,14 +723,14 @@ export async function holdReservation(req, res) {
     let reservation = await Reservation.findById(req.params.id);
     if (
       req.user.role !== "ADMIN" &&
-      !reservation.reviewers.find((r) => r.role === req.user.role)
+      !reservation.reviewers.some((r) => r.role.includes(req.user.role))
     ) {
       return res
         .status(403)
         .json({ message: "You are not authorized to perform this action" });
     }
     reservation.reviewers = reservation.reviewers.map((reviewer) => {
-      if (reviewer.role === req.user.role) {
+      if (reviewer.role.includes(req.user.role)) {
         reviewer.status = "HOLD";
         if (req.body.comments) reviewer.comments = req.body.comments;
       }
@@ -668,31 +786,23 @@ export const getPendingReservations = async (req, res) => {
       });
       return res.status(200).json(reservations);
     } else if (req.user.role !== "ADMIN") {
-      // For Chairman or other roles, don't show forms where any reviewer has rejected
-      const reservations = await Reservation.find({
+      // For non-ADMIN roles (like Chairman, Dean, etc.), show all reservations where they are a reviewer
+      // and their specific review is still pending
+      console.log("Getting reservations for non-ADMIN role...",req.user.role,req.user.email);
+      const reservations = await Reservation.find({}).sort({ createdAt: -1 });
+      const filteredReservations = reservations.filter(res => {
+        return res.reviewers.some(reviewer => 
+          reviewer.role.includes(req.user.role) && reviewer.status === "PENDING"
+        );
+      });
+      res.status(200).json(filteredReservations);
+    } else {
+      // For ADMIN, show all PENDING reservations where admin's review is still pending
+      const reservations = await Reservation.find({ 
         reviewers: {
           $elemMatch: {
-            role: req.user.role,
-            status: "PENDING",
-          },
-        },
-        // Don't show forms where any reviewer has rejected it
-        "reviewers.status": { $nin: ["REJECTED"] }
-      }).sort({
-        createdAt: -1,
-      });
-      res.status(200).json(reservations);
-    } else {
-      // For ADMIN, don't show forms that have been rejected by Chairman
-      const reservations = await Reservation.find({ 
-        status: "PENDING",
-        // Don't show forms where chairman has rejected
-        reviewers: {
-          $not: {
-            $elemMatch: {
-              role: "CHAIRMAN",
-              status: "REJECTED"
-            }
+            role: "ADMIN",
+            status: "PENDING"
           }
         }
       }).sort({
@@ -717,24 +827,27 @@ export const getApprovedReservations = async (req, res) => {
       });
       return res.status(200).json(reservations);
     } else if (req.user.role === "ADMIN") {
+      // For ADMIN show reservations where ADMIN has approved (regardless of overall status)
       const reservations = await Reservation.find({
-        status: "APPROVED",
+        reviewers: {
+          $elemMatch: {
+            role: "ADMIN",
+            status: "APPROVED"
+          }
+        }
       }).sort({
         createdAt: -1,
       });
       res.status(200).json(reservations);
     } else {
-      const reservations = await Reservation.find({
-        reviewers: {
-          $elemMatch: {
-            role: req.user.role,
-            status: "APPROVED",
-          },
-        },
-      }).sort({
-        createdAt: -1,
+      // For non-ADMIN roles show reservations where their role has approved (regardless of overall status)
+      const reservations = await Reservation.find({}).sort({ createdAt: -1 });
+      const filteredReservations = reservations.filter(res => {
+        return res.reviewers.some(reviewer => 
+          reviewer.role.includes(req.user.role) && reviewer.status === "APPROVED"
+        );
       });
-      res.status(200).json(reservations);
+      res.status(200).json(filteredReservations);
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -742,70 +855,37 @@ export const getApprovedReservations = async (req, res) => {
 };
 
 export const getRejectedReservations = async (req, res) => {
-  console.log("Getting rejected reservations...");
   try {
     if (req.user.role === "USER") {
-      // For users, show all rejected reservations
       const reservations = await Reservation.find({
         guestEmail: req.user.email,
         status: "REJECTED",
       }).sort({
         createdAt: -1,
       });
+      console.log(reservations);
       return res.status(200).json(reservations);
     } else if (req.user.role === "ADMIN") {
-      // For admin, show reservations that are rejected (either by admin or by other reviewers)
-      const reservations = await Reservation.find({
-        status: "REJECTED",
-      }).sort({
-        createdAt: -1,
-      });
-      res.status(200).json(reservations);
-    } else if (req.user.role === "CHAIRMAN") {
-      // For chairman, show reservations where either:
-      // 1. The chairman personally rejected it (so they can revert/accept again)
-      // 2. The reservation's overall status is REJECTED but not rejected by admin
-      const reservations = await Reservation.find({
-        $or: [
-          // Chairman personally rejected it
-          {
-            reviewers: {
-              $elemMatch: {
-                role: "CHAIRMAN",
-                status: "REJECTED",
-              },
-            },
-          },
-          // Overall status is REJECTED but not rejected by admin
-          {
-            status: "REJECTED",
-            reviewers: {
-              $not: {
-                $elemMatch: {
-                  role: "ADMIN",
-                  status: "REJECTED",
-                },
-              },
-            },
-          },
-        ],
-      }).sort({
-        createdAt: -1,
-      });
-      res.status(200).json(reservations);
-    } else {
-      // For other roles, show reservations they personally rejected
       const reservations = await Reservation.find({
         reviewers: {
           $elemMatch: {
-            role: req.user.role,
-            status: "REJECTED",
-          },
-        },
+            role: "ADMIN",
+            status: "REJECTED"
+          }
+        }
       }).sort({
         createdAt: -1,
       });
+      console.log(reservations);
       res.status(200).json(reservations);
+    } else {
+      const reservations = await Reservation.find({}).sort({ createdAt: -1 });
+      const filteredReservations = reservations.filter(res => {
+        return res.reviewers.some(reviewer => 
+          reviewer.role.includes(req.user.role) && reviewer.status === "REJECTED"
+        );
+      });
+      res.status(200).json(filteredReservations);
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -835,42 +915,18 @@ export const updatePaymentStatus = async (req, res) => {
 
 const updateReservationStatus = async (reservation) => {
   let initStatus = reservation.status;
-  let reviewers = reservation.reviewers;
   const userEmail = reservation.guestEmail;
 
-  let isApproved = false;
-  let isRejected = false;
-  let adminStatus;
-  reviewers.forEach((reviewer) => {
-    if (reviewer.role === "ADMIN") {
-      adminStatus = reviewer.status;
-    } else {
-      if (reviewer.status === "APPROVED") {
-        isApproved = true;
-      }
-      if (reviewer.status === "REJECTED") {
-        isRejected = true;
-      }
-    }
-  });
-  if (adminStatus === "APPROVED") {
-    isApproved = true;
-  } else if (adminStatus === "REJECTED") {
-    isRejected = true;
-  }
-
-  if (isRejected) {
+  // Determine overall status: reject if any reviewer rejects, approve only if all approve, otherwise pending
+  if (reservation.reviewers.some((r) => r.status === "REJECTED")) {
     reservation.status = "REJECTED";
-  } else if (isApproved) {
+  } else if (reservation.reviewers.every((r) => r.status === "APPROVED")) {
     reservation.status = "APPROVED";
   } else {
     reservation.status = "PENDING";
   }
-  if (reservation.status === "APPROVED") {
-    reservation.stepsCompleted = 2;
-  } else {
-    reservation.stepsCompleted = 1;
-  }
+  // Update stepsCompleted as count of approvals
+  reservation.stepsCompleted = reservation.reviewers.filter((r) => r.status === "APPROVED").length;
   if (initStatus !== reservation.status) {
     try {
       const user = await User.findOne({ email: userEmail });
@@ -1560,7 +1616,7 @@ export const getDiningAmount = async (req, res) => {
   }
 };
 
-export const editReservation = async (req, res) => {
+export async function editReservation(req, res) {
   try {
     const { id } = req.params;
     
@@ -1641,25 +1697,39 @@ export const editReservation = async (req, res) => {
       });
     }
 
-    // Determine reviewers based on category
+    // Prepare reviewers array for edited reservation
     let reviewersArray = [];
     
-    // Ensure both admin and chairman are added as reviewers when form is edited
+    // Always add admin as a reviewer
     reviewersArray.push({ role: "ADMIN", comments: "Form edited by user", status: "PENDING" });
     
-    // For specific categories, always add chairman
-    if (req.body.category === 'BR-A' || req.body.category === 'BR-B1' || 
-        req.body.category === 'BR-B2' || req.body.category === 'ES-B') {
-      reviewersArray.push({ role: "CHAIRMAN", comments: "Form edited by user", status: "PENDING" });
-    } else {
-      // For category ES-A, check if chairman was previously a reviewer
-      const wasChairmanReviewer = existingReservation.reviewers.some(
-        reviewer => reviewer.role === "CHAIRMAN" || reviewer.role.startsWith("CHAIRMAN ")
-      );
+    // Add the user-selected reviewers from the form submission
+    if (req.body.reviewers) {
+      const reviewers = req.body.reviewers;
+      const subroles = req.body.subroles || "";
       
-      if (wasChairmanReviewer) {
-        reviewersArray.push({ role: "CHAIRMAN", comments: "Form edited by user", status: "PENDING" });
-      }
+      const subrolesArray = subroles ? subroles.split(",") : [];
+      const userSelectedReviewers = reviewers ? reviewers.split(",").map((role, index) => ({
+        role:
+          role +
+          (subrolesArray[index] && subrolesArray[index] !== "Select" ? " " + subrolesArray[index] : ""),
+        comments: "Form edited by user",
+        status: "PENDING",
+      })) : [];
+      
+      // Add all user-selected reviewers
+      reviewersArray.push(...userSelectedReviewers);
+    } else {
+      // If no new reviewers specified, preserve the existing ones (except ADMIN which we already added)
+      const nonAdminReviewers = existingReservation.reviewers
+        .filter(reviewer => reviewer.role !== "ADMIN")
+        .map(reviewer => ({
+          role: reviewer.role,
+          comments: "Form edited by user",
+          status: "PENDING"
+        }));
+      
+      reviewersArray.push(...nonAdminReviewers);
     }
 
     // Prepare update data

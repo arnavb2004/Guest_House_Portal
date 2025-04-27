@@ -6,9 +6,16 @@ import "react-toastify/dist/ReactToastify.min.css";
 import {
   FormControl,
   Select,
-  MenuItem,
-  Checkbox,
+  Radio,
   TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Typography,
+  MenuItem,
+  ListSubheader,
+  InputLabel,
+  FormHelperText
 } from "@mui/material";
 import "./Reservation_Form.css";
 import { updateFilledPDF } from "../utils/generatePDF";
@@ -62,6 +69,9 @@ function ReservationForm() {
       email: "",
     },
     signature: null, // Add signature property
+    primaryAuthority: "Select",
+    secondaryAuthority: "Select",
+    selectedReviewers: []
   });
 
   const [errorText, setErrorText] = useState({
@@ -117,38 +127,38 @@ function ReservationForm() {
     "BR-B2": "Business Room - Category B2 (₹1200)",
   };
 
-  const catESAReviewers = ["DIRECTOR"];
+  const catESAReviewers = ["DIRECTOR", "DEAN RESEARCH AND DEVELOPMENT", "DEAN STUDENT AFFAIRS", "DEAN FACULTY AFFAIRS AND ADMINISTRATION", "DEAN UNDER GRADUATE STUDIES", "DEAN POST GRADUATE STUDIES"];
   const catESBReviewers = ["CHAIRMAN"];
-  const catBRAReviewers = ["REGISTRAR"];
-  const catBRB1Reviewers = ["DEAN"];
+  const catBRAReviewers = ["REGISTRAR", "DIRECTOR","DEAN RESEARCH AND DEVELOPMENT", "DEAN STUDENT AFFAIRS", "DEAN FACULTY AFFAIRS AND ADMINISTRATION", "DEAN UNDER GRADUATE STUDIES", "DEAN POST GRADUATE STUDIES", "ASSOCIATE DEAN HOSTEL MANAGEMENT", "ASSOCIATE DEAN INTERNATIONAL RELATIONS AND ALUMNI AFFAIRS", "ASSOCIATE DEAN CONTINUING EDUCATION AND OUTREACH ACTIVITIES", "ASSOCIATE DEAN INFRASTRUCTURE"];
+  const catBRB1Reviewers = ["DEAN RESEARCH AND DEVELOPMENT", "DEAN STUDENT AFFAIRS", "DEAN FACULTY AFFAIRS AND ADMINISTRATION", "DEAN UNDER GRADUATE STUDIES", "DEAN POST GRADUATE STUDIES","ASSOCIATE DEAN HOSTEL MANAGEMENT", "ASSOCIATE DEAN INTERNATIONAL RELATIONS AND ALUMNI AFFAIRS", "ASSOCIATE DEAN CONTINUING EDUCATION AND OUTREACH ACTIVITIES", "ASSOCIATE DEAN INFRASTRUCTURE", "REGISTRAR","HOD COMPUTER SCIENCE", "HOD ELECTRICAL ENGINEERING", "HOD MECHANICAL ENGINEERING", "HOD CHEMISTRY", "HOD MATHEMATICS", "HOD PHYSICS", "HOD HUMANITIES AND SOCIAL SCIENCES", "HOD BIOMEDICAL ENGINEERING", "HOD CHEMICAL ENGINEERING", "HOD METALLURGICAL AND MATERIALS ENGINEERING", "HOD CIVIL ENGINEERING"];
   const catBRB2Reviewers = ["CHAIRMAN"];
 
   const Hods = [
-    "COMPUTER SCIENCE",
-    "ELECTRICAL ENGINEERING",
-    "MECHANICAL ENGINEERING",
-    "CHEMISTRY",
-    "MATHEMATICS",
-    "PHYSICS",
-    "HUMANITIES AND SOCIAL SCIENCES",
-    "BIOMEDICAL ENGINEERING",
-    "CHEMICAL ENGINEERING",
-    "METALLURGICAL AND MATERIALS ENGINEERING",
+    "HOD COMPUTER SCIENCE",
+    "HOD ELECTRICAL ENGINEERING",
+    "HOD MECHANICAL ENGINEERING",
+    "HOD CHEMISTRY",
+    "HOD MATHEMATICS",
+    "HOD PHYSICS",
+    "HOD HUMANITIES AND SOCIAL SCIENCES",
+    "HOD BIOMEDICAL ENGINEERING",
+    "HOD CHEMICAL ENGINEERING",
+    "HOD METALLURGICAL AND MATERIALS ENGINEERING",
   ];
 
   const AssociateDeans = [
-    "HOSTEL MANAGEMENT",
-    "INTERNATIONAL RELATIONS AND ALUMNI AFFAIRS",
-    "CONTINUING EDUCATION AND OUTREACH ACTIVITIES",
-    "INFRASTRUCTURE",
+    "ASSOCIATE DEAN HOSTEL MANAGEMENT",
+    "ASSOCIATE DEAN INTERNATIONAL RELATIONS AND ALUMNI AFFAIRS",
+    "ASSOCIATE DEAN CONTINUING EDUCATION AND OUTREACH ACTIVITIES",
+    "ASSOCIATE DEAN INFRASTRUCTURE",
   ];
 
   const Deans = [
-    "RESEARCH AND DEVELOPMENT",
-    "STUDENT AFFAIRS",
-    "FACULTY AFFAIRS AND ADMINISTRATION",
-    "UNDER GRADUATE STUDIES",
-    "POST GRADUATE STUDIES",
+    "DEAN RESEARCH AND DEVELOPMENT",
+    "DEAN STUDENT AFFAIRS",
+    "DEAN FACULTY AFFAIRS AND ADMINISTRATION",
+    "DEAN UNDER GRADUATE STUDIES",
+    "DEAN POST GRADUATE STUDIES",
   ];
 
   const subroles = {
@@ -178,14 +188,6 @@ function ReservationForm() {
     "Double Occupancy": 1200,
   };
 
-  const catReviewers = {
-    "ES-A": catESAReviewers,
-    "ES-B": catESBReviewers,
-    "BR-A": catBRAReviewers,
-    "BR-B1": catBRB1Reviewers,
-    "BR-B2": catBRB2Reviewers,
-  };
-
   const roomFare = {
     "ES-A": roomFareESA,
     "ES-B": roomFareESB,
@@ -195,52 +197,188 @@ function ReservationForm() {
   };
 
   const [checkedValues, setCheckedValues] = useState([]);
+  const [selectedPrimaryReviewer, setSelectedPrimaryReviewer] = useState("Select");
+  const [selectedSecondaryReviewer, setSelectedSecondaryReviewer] = useState("Select");
+  const [validationError, setValidationError] = useState("");
 
   console.log(checkedValues);
   console.log(subRole);
+
+  // Effect to handle category changes and auto-select appropriate authorities
+  useEffect(() => {
+    // Auto-select authorities based on category
+    switch(formData.category) {
+      case "ES-B":
+        // Chairman only - automatically selected
+        setCheckedValues(["CHAIRMAN"]);
+        setFormData(prev => ({
+          ...prev,
+          primaryAuthority: "CHAIRMAN",
+          secondaryAuthority: "Select"
+        }));
+        break;
+        
+      case "BR-B2":
+        // Chairman only - automatically selected
+        setCheckedValues(["CHAIRMAN"]);
+        setFormData(prev => ({
+          ...prev,
+          primaryAuthority: "CHAIRMAN",
+          secondaryAuthority: "Select"
+        }));
+        break;
+        
+      default:
+        // Reset for other categories unless values are already set
+        if (formData.category === "ES-A" || formData.category === "BR-A" || formData.category === "BR-B1") {
+          // Only reset if we're switching to a new category
+          if (!checkedValues.length) {
+            setFormData(prev => ({
+              ...prev,
+              primaryAuthority: "Select",
+              secondaryAuthority: "Select"
+            }));
+          }
+        }
+        break;
+    }
+  }, [formData.category]);
+
+  const handleCategoryChange = (e) => {
+    const newCategory = e.target.value;
+    setFormData({
+      ...formData,
+      category: newCategory,
+    });
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     console.log(name, value);
     if (name === "category") {
-      // Reset reviewers based on new category selection
-      const reviewers = catReviewers[value] || [];
-      setCheckedValues(reviewers);
-      setSubRole(Array(reviewers.length).fill("Select"));
+      // Reset reviewers when changing category - don't auto-select any
+      setCheckedValues([]);
+      setSubRole([]);
     }
     setFormData({
       ...formData,
       [name]: value,
     });
   };
+
   const handleCheckboxChange = (event) => {
     const { value, checked } = event.target;
+    
     if (checked) {
-      setCheckedValues((prevCheckedValues) => [...prevCheckedValues, value]);
-      setSubRole((prevSubRole) => [...prevSubRole, "Select"]);
+      // If checking, handle appropriately based on category:
+      if (formData.category === "ES-A") {
+        // Only allow one authority for ES-A
+        setCheckedValues([value]);
+        setFormData({...formData, primaryAuthority: value});
+      } 
+      else if (formData.category === "BR-A" && value === "DIRECTOR") {
+        // If selecting Director for BR-A, clear any other selections
+        setCheckedValues([value]);
+        setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+      }
+      else if (formData.category === "BR-A" && value === "REGISTRAR") {
+        // If selecting Registrar for BR-A, set as primary and reset secondary
+        setCheckedValues([value]);
+        setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+      }
+      else if (formData.category === "BR-A" && (Deans.includes(value) || AssociateDeans.includes(value))) {
+        // For BR-A, ensure Registrar is still included if selecting a secondary authority
+        if (checkedValues.includes("REGISTRAR")) {
+          setCheckedValues(["REGISTRAR", value]);
+          setFormData({...formData, secondaryAuthority: value});
+        } else {
+          // If no primary yet, treat this as a single selection
+          setCheckedValues([value]);
+          setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+        }
+      }
+      else if (formData.category === "BR-B1") {
+        // For BR-B1, handle Dean + secondary authority
+        if (Deans.includes(value)) {
+          // If selecting a Dean, keep it as primary and clear secondary
+          setCheckedValues([value]);
+          setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+        } 
+        else if (AssociateDeans.includes(value) || Hods.includes(value) || value === "REGISTRAR") {
+          // If selecting a secondary authority, ensure a Dean is still primary
+          const existingDean = checkedValues.find(val => Deans.includes(val));
+          if (existingDean) {
+            setCheckedValues([existingDean, value]);
+            setFormData({...formData, secondaryAuthority: value});
+          } else {
+            // If no Dean selected yet, just keep the current selection
+            setCheckedValues([value]);
+            setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+          }
+        }
+      }
+      else {
+        // Default case: add to checked values
+        setCheckedValues([...checkedValues, value]);
+      }
     } else {
-      setCheckedValues((prevCheckedValues) => {
-        const temp = [...prevCheckedValues];
-        const index = temp.indexOf(value);
-
-        console.log(index);
-        temp.splice(index, 1);
-
-        subRole.splice(index, 1);
-        return temp;
-      });
+      // If unchecking (shouldn't happen with radio buttons but keeping as safeguard)
+      setCheckedValues([]);
+      setSubRole([]);
     }
   };
 
-  const handleSubRoleChange = (event, reviewer) => {
-    const index = checkedValues.indexOf(reviewer);
-    const temp = [...subRole];
-    temp[index] = event.target.value;
-    setSubRole(temp);
+  // Function to handle subrole selection
+  const handleSubRoleChange = (event, roleType) => {
+    const selectedSubRole = event.target.value;
+    const roleIndex = checkedValues.indexOf(roleType);
+    
+    if (roleIndex !== -1) {
+      setSubRole((prev) => {
+        const newSubRoles = [...prev];
+        newSubRoles[roleIndex] = selectedSubRole;
+        return newSubRoles;
+      });
+    }
   };
 
   const handleFileUpload = (files) => {
     setFiles(files);
   };
+
+  const buildReviewersList = () => {
+    switch(formData.category) {
+      case "ES-A":
+        // Return the single selected reviewer
+        return checkedValues;
+        
+      case "ES-B":
+      case "BR-B2":
+        // Always Chairman
+        return ["CHAIRMAN"];
+        
+      case "BR-A":
+        if (checkedValues.includes("DIRECTOR")) {
+          // If Director is selected, only Director approves
+          return ["DIRECTOR"];
+        } else if (checkedValues.length > 0 && formData.secondaryAuthority) {
+          // Primary + Secondary authorities
+          return [checkedValues[0], formData.secondaryAuthority];
+        }
+        return checkedValues; // Fallback
+        
+      case "BR-B1":
+        if (checkedValues.length > 0 && formData.secondaryAuthority) {
+          // Dean + Secondary authority
+          return [checkedValues[0], formData.secondaryAuthority];
+        }
+        return checkedValues; // Fallback
+        
+      default:
+        return checkedValues;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -471,11 +609,66 @@ function ReservationForm() {
       }
       
       // Add reviewers and subroles
-      formDataToSend.append("reviewers", checkedValues);
-      formDataToSend.append("subroles", subRole);
+      let formattedReviewers = [];
       
-      // Add receipt file
-      formDataToSend.append("receipt", receiptFile);
+      // Handle specific reviewer cases based on category
+      if (formData.category === "ES-B" || formData.category === "BR-B2") {
+        // Chairman is always the only reviewer for these categories
+        formattedReviewers = ["CHAIRMAN"];
+      }
+      else if (formData.category === "BR-A") {
+        // BR-A has three cases: Director alone, Registrar alone, or Dean + Associate Dean
+        if (checkedValues.includes("DIRECTOR")) {
+          formattedReviewers = ["DIRECTOR"];
+        } 
+        else if (checkedValues.includes("REGISTRAR")) {
+          formattedReviewers = ["REGISTRAR"];
+        }
+        else if (checkedValues.length === 2) {
+          // Dean + Associate Dean case
+          formattedReviewers = [...checkedValues];
+        }
+        else if (checkedValues.length === 1 && Deans.includes(checkedValues[0])) {
+          // Only Dean selected without Associate Dean (incomplete)
+          toast.error("For BR-A with Dean, you must also select an Associate Dean as secondary authority");
+          setLoading(false);
+          return;
+        }
+      }
+      else if (formData.category === "BR-B1" && checkedValues.length === 2) {
+        // For BR-B1, add the primary and secondary authorities
+        formattedReviewers = [...checkedValues];
+      }
+      else {
+        // For other cases, use the checked values directly
+        formattedReviewers = [...checkedValues];
+      }
+      
+      // Make sure we have at least one reviewer
+      if (formattedReviewers.length === 0) {
+        toast.error("No approving authorities selected. Please select the required authorities.");
+        setLoading(false);
+        return;
+      }
+      
+      console.log("Final reviewers to be submitted:", formattedReviewers);
+      
+      // Add reviewers to formData
+      formDataToSend.append('reviewers', formattedReviewers.join(','));
+      
+      // Add empty subroles for compatibility
+      const subrolesArray = new Array(formattedReviewers.length).fill("Select");
+      formDataToSend.append('subroles', subrolesArray.join(','));
+      
+      // Add receipt file (REQUIRED by server)
+      if (!receiptFile) {
+        // Create a dummy receipt file if none is provided
+        const dummyBlob = new Blob(['Receipt placeholder'], { type: 'application/pdf' });
+        const dummyFile = new File([dummyBlob], 'receipt.pdf', { type: 'application/pdf' });
+        formDataToSend.append('receipt', dummyFile);
+      } else {
+        formDataToSend.append('receipt', receiptFile);
+      }
       
       // Show loading toast
       const toast_id = toast.loading("Submitting reservation...");
@@ -538,12 +731,7 @@ function ReservationForm() {
     }
   };
 
-  const [showCheckbox, setShowCheckbox] = useState(false);
-
-  useEffect(() => {
-    // setShowCheckbox(false);
-    setShowCheckbox(true);
-  }, [formData.category]);
+  const [showCheckbox, setShowCheckbox] = useState(true);
 
   // Enhanced autofill handler function
   const handleAutofill = () => {
@@ -552,9 +740,9 @@ function ReservationForm() {
     
     // Determine department from role if possible
     let department = "";
-    if (userData.role && userData.role.startsWith("HOD_")) {
-      // Extract department from HOD role (e.g., HOD_COMPUTER_SCIENCE)
-      department = userData.role.replace("HOD_", "").replace(/_/g, " ");
+    if (userData.role && userData.role.startsWith("HOD ")) {
+      // Extract department from HOD role (e.g., HOD COMPUTER_SCIENCE)
+      department = userData.role.replace("HOD ", "").replace(/_/g, " ");
     } else if (userData.department) {
       department = userData.department;
     }
@@ -562,7 +750,7 @@ function ReservationForm() {
     // Determine designation from role if possible
     let designation = "";
     if (userData.role) {
-      if (userData.role.startsWith("HOD_")) {
+      if (userData.role.startsWith("HOD ")) {
         designation = "HOD";
       } else if (userData.role === "DEAN") {
         designation = "DEAN";
@@ -637,6 +825,128 @@ function ReservationForm() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // First, add a helper function to parse and display secondary authority values
+  const getSecondaryAuthorityDisplayValue = (value) => {
+    if (!value || value === "Select") return "Select Secondary Authority";
+    
+    if (value === "REGISTRAR") return "Registrar";
+    
+    // Handle Associate Deans
+    if (value.startsWith("")) {
+      return `Associate Dean - ${value.replace("ASSOCIATE DEAN ", "")}`;
+    }
+    
+    // Handle HODs
+    if (value.startsWith("HOD ")) {
+      return `HoD - ${value.replace("HOD ", "")}`;
+    }
+    
+    return value;
+  };
+
+  // Function to validate category-specific approval requirements
+  const validateCategoryApproval = () => {
+    const { category, primaryAuthority, secondaryAuthority } = formData;
+    let isValid = true;
+    let errorMessage = "";
+    
+    switch (category) {
+      case "ES-A":
+        // Any one from Director or any Dean
+        if (checkedValues.length === 0 || !catESAReviewers.includes(checkedValues[0])) {
+          errorMessage = "For category ES-A, please select Director or any Dean as approving authority";
+          isValid = false;
+        }
+        break;
+        
+      case "ES-B":
+        // Chairman only - automatically selected, so should always be valid
+        if (checkedValues.length !== 1 || checkedValues[0] !== "CHAIRMAN") {
+          // Auto-select if not already selected
+          setCheckedValues(["CHAIRMAN"]);
+        }
+        break;
+        
+      case "BR-A":
+        // Either Director alone OR Registrar alone OR Dean + Associate Dean
+        if (checkedValues.includes("DIRECTOR")) {
+          // Director only case - valid
+          if (checkedValues.length !== 1) {
+            errorMessage = "For BR-A with Director, only Director should be selected";
+            isValid = false;
+          }
+        } else if (checkedValues.includes("REGISTRAR")) {
+          // Registrar alone - valid
+          if (checkedValues.length !== 1) {
+            errorMessage = "For BR-A with Registrar, no secondary authority should be selected";
+            isValid = false;
+          }
+        } else if (checkedValues.length > 0 && Deans.includes(checkedValues[0])) {
+          // Dean + Associate Dean case
+          if (checkedValues.length !== 2) {
+            errorMessage = "For BR-A with Dean, you must also select an Associate Dean as secondary authority";
+            isValid = false;
+          } else {
+            const secondAuthority = checkedValues.find(val => val !== checkedValues[0]);
+            if (!secondAuthority || !AssociateDeans.includes(secondAuthority)) {
+              errorMessage = "For category BR-A with Dean, secondary authority must be an Associate Dean";
+              isValid = false;
+            }
+          }
+        } else {
+          errorMessage = "For category BR-A, select either Director alone, Registrar alone, or a Dean with an Associate Dean";
+          isValid = false;
+        }
+        break;
+        
+      case "BR-B1":
+        // Any Dean + (any Associate Dean OR any HOD OR Registrar)
+        if (checkedValues.length !== 2) {
+          errorMessage = "For category BR-B1, you must select both a Dean and a secondary authority";
+          isValid = false;
+        } else {
+          // Check if a Dean is selected
+          const selectedDean = checkedValues.find(val => Deans.includes(val));
+          if (!selectedDean) {
+            errorMessage = "For category BR-B1, primary authority must be a Dean";
+            isValid = false;
+          }
+          
+          // Check if secondary authority is valid
+          const secondAuthority = checkedValues.find(val => !Deans.includes(val));
+          if (!secondAuthority || 
+              (!AssociateDeans.includes(secondAuthority) && 
+               !Hods.includes(secondAuthority) && 
+               secondAuthority !== "REGISTRAR")) {
+            errorMessage = "For category BR-B1, secondary authority must be an Associate Dean, HOD, or Registrar";
+            isValid = false;
+          }
+        }
+        break;
+        
+      case "BR-B2":
+        // Chairman only - automatically selected, so should always be valid
+        if (checkedValues.length !== 1 || checkedValues[0] !== "CHAIRMAN") {
+          // Auto-select if not already selected
+          setCheckedValues(["CHAIRMAN"]);
+        }
+        break;
+        
+      default:
+        errorMessage = "Please select a valid category";
+        isValid = false;
+    }
+    
+    if (!isValid) {
+      toast.error(errorMessage);
+      setValidationError(errorMessage);
+    } else {
+      setValidationError("");
+    }
+    
+    return isValid;
   };
 
   return (
@@ -774,16 +1084,14 @@ function ReservationForm() {
             <select
               name="category"
               className="w-full h-12 border rounded-md border-gray-300 p-2 mb-5 whitespace-pre"
-              onChange={handleChange}
+              onChange={handleCategoryChange}
               value={formData.category}
             >
-              {Object.entries(categoryInfo).map(
-                ([categoryCode, categoryName]) => (
-                  <option key={categoryCode} value={categoryCode}>
-                    {categoryName}
-                  </option>
-                )
-              )}
+              {Object.entries(categoryInfo).map(([categoryCode, categoryName]) => (
+                <option key={categoryCode} value={categoryCode}>
+                  {categoryName}
+                </option>
+              ))}
             </select>
             <div className="form-group">
               <label>Room Type*</label>
@@ -816,63 +1124,213 @@ function ReservationForm() {
                 </option>
               </select>
             </div>
-            {showCheckbox && (
-                <div className="w-full p-2 mb-5">
-                  <ul className="flex flex-col flex-wrap justify-start gap-1">
-                    {catReviewers[formData.category]?.map((reviewer) => (
-                      <li
-                        key={reviewer}
-                        className="flex justify-start gap-1 items-center"
-                      >
-                        <Checkbox
-                          name="reviewers"
-                          id={reviewer}
-                          value={reviewer}
-                          checked={checkedValues.includes(reviewer)}
-                          onChange={handleCheckboxChange}
-                          inputProps={{ "aria-label": reviewer }}
-                        />
-                        <label className="w-32" htmlFor={reviewer}>
-                          {reviewer}
-                        </label>
-                        {reviewer === "DEAN" &&
-                          checkedValues.includes("DEAN") && (
-                            <FormControl>
-                              <Select
-                                labelId="sub-role-label"
-                                id="sub-role-select"
-                                value={
-                                  subRole[checkedValues.indexOf("DEAN")] ||
-                                  "Select"
-                                }
-                                onChange={(e) =>
-                                  handleSubRoleChange(e, reviewer)
-                                }
-                              >
-                                <MenuItem value="Select">Select</MenuItem>
-                                <MenuItem value="RESEARCH AND DEVELOPMENT">
-                                  Research and Development
-                                </MenuItem>
-                                <MenuItem value="STUDENT AFFAIRS">
-                                  Student Affairs
-                                </MenuItem>
-                                <MenuItem value="FACULTY AFFAIRS AND ADMINISTRATION">
-                                  Faculty Affairs & Administration
-                                </MenuItem>
-                                <MenuItem value="UNDER GRADUATE STUDIES">
-                                  Under Graduate Studies
-                                </MenuItem>
-                                <MenuItem value="POST GRADUATE AND RESEARCH">
-                                  Post Graduate & Research
-                                </MenuItem>
-                              </Select>
-                            </FormControl>
-                          )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                {showCheckbox && (
+      <div className="w-full p-2 mb-5">
+        <label className="font-semibold mb-2 block">Approving Authority*:</label>
+        {validationError && <div className="text-red-500 text-sm mb-2">{validationError}</div>}
+        
+        {/* Category-specific instructions */}
+        <div className="text-sm text-gray-600 mb-3 whitespace-normal overflow-visible">
+          {formData.category === "ES-A" && "Select one authority: Director or any Dean"}
+          {formData.category === "ES-B" && "Chairman is automatically selected"}
+          {formData.category === "BR-A" && "Select one: Director OR Registrar OR any Dean (with Associate/Concerned Dean)"}
+          {formData.category === "BR-B1" && "Select a Dean as primary plus a secondary authority"}
+          {formData.category === "BR-B2" && "Chairman is automatically selected"}
+        </div>
+        
+        {/* ES-A: Using Clean Dropdown */}
+        {formData.category === "ES-A" && (
+          <FormControl fullWidth variant="outlined" className="mb-4">
+            <InputLabel>Select Approving Authority</InputLabel>
+            <Select
+              value={checkedValues.length > 0 ? checkedValues[0] : ""}
+              onChange={(e) => {
+                setCheckedValues([e.target.value]);
+                setFormData({...formData, primaryAuthority: e.target.value});
+              }}
+              label="Select Approving Authority"
+            >
+              <MenuItem value="DIRECTOR">DIRECTOR</MenuItem>
+              <ListSubheader>Deans</ListSubheader>
+              {Deans.map(dean => (
+                <MenuItem key={dean} value={dean}>{dean}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        
+        {/* ES-B: Using Clean Dropdown (disabled) */}
+        {formData.category === "ES-B" && (
+          <FormControl fullWidth variant="outlined" className="mb-4">
+            <InputLabel>Approving Authority</InputLabel>
+            <Select
+              value="CHAIRMAN"
+              label="Approving Authority"
+              disabled
+            >
+              <MenuItem value="CHAIRMAN">CHAIRMAN</MenuItem>
+            </Select>
+            <div className="mt-2 text-sm text-blue-600">
+              <i className="fas fa-info-circle"></i> Request will be sent to the Chairman
+            </div>
+          </FormControl>
+        )}
+        
+        {/* BR-A: Primary Authority Dropdown with Conditional Secondary */}
+        {formData.category === "BR-A" && (
+          <>
+            <FormControl fullWidth variant="outlined" className="mb-3">
+              <InputLabel>Primary Authority</InputLabel>
+              <Select
+                value={formData.primaryAuthority !== "Select" ? formData.primaryAuthority : ""}
+                onChange={(e) => {
+                  if (e.target.value === "DIRECTOR") {
+                    // Director only
+                    setCheckedValues(["DIRECTOR"]);
+                    setFormData({...formData, primaryAuthority: e.target.value, secondaryAuthority: "Select"});
+                  } else if (e.target.value === "REGISTRAR") {
+                    // Registrar only
+                    setCheckedValues(["REGISTRAR"]);
+                    setFormData({...formData, primaryAuthority: e.target.value, secondaryAuthority: "Select"});
+                  } else if (Deans.includes(e.target.value)) {
+                    // Dean selected, will need a secondary authority
+                    setCheckedValues([e.target.value]);
+                    setFormData({...formData, primaryAuthority: e.target.value, secondaryAuthority: "Select"});
+                  }
+                }}
+                label="Primary Authority"
+                MenuProps={{
+                  PaperProps: { style: { maxHeight: 300 } }
+                }}
+              >
+                <MenuItem value="DIRECTOR">DIRECTOR</MenuItem>
+                <MenuItem value="REGISTRAR">REGISTRAR</MenuItem>
+                <ListSubheader style={{ lineHeight: '30px', backgroundColor: '#f5f5f5' }}>Deans</ListSubheader>
+                {Deans.map(dean => (
+                  <MenuItem key={dean} value={dean}>
+                    <div style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}>{dean}</div>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {/* Secondary Dropdown (only shows if Dean is selected) */}
+            {formData.primaryAuthority !== "Select" && 
+             formData.primaryAuthority !== "DIRECTOR" && 
+             formData.primaryAuthority !== "REGISTRAR" && 
+             Deans.includes(formData.primaryAuthority) && (
+              <FormControl fullWidth variant="outlined" className="mb-3">
+                <InputLabel>Secondary Authority</InputLabel>
+                <Select
+                  value={formData.secondaryAuthority !== "Select" ? formData.secondaryAuthority : ""}
+                  onChange={(e) => {
+                    setFormData({...formData, secondaryAuthority: e.target.value});
+                    setCheckedValues([formData.primaryAuthority, e.target.value]);
+                  }}
+                  label="Secondary Authority"
+                  MenuProps={{
+                    PaperProps: { style: { maxHeight: 300 } }
+                  }}
+                >
+                  <ListSubheader style={{ lineHeight: '30px', backgroundColor: '#f5f5f5' }}>Associate Deans</ListSubheader>
+                  {AssociateDeans.map(assocDean => (
+                    <MenuItem key={assocDean} value={assocDean}>
+                      <div style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}>{assocDean}</div>
+                    </MenuItem>
+                  ))}
+                </Select>
+                {formData.secondaryAuthority !== "Select" && (
+                  <div className="mt-2 text-sm text-blue-600 whitespace-normal">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    Request will be sent to both {formData.primaryAuthority} and {formData.secondaryAuthority}
+                  </div>
+                )}
+              </FormControl>
+            )}
+            
+            {/* Info for single authority selections */}
+            {(formData.primaryAuthority === "DIRECTOR" || formData.primaryAuthority === "REGISTRAR") && (
+              <div className="mt-2 text-sm text-blue-600 whitespace-normal">
+                <i className="fas fa-info-circle mr-1"></i>
+                Request will be sent to the {formData.primaryAuthority}
+              </div>
+            )}
+          </>
+        )}
+        
+        {/* BR-B1: Primary and Secondary Dropdowns */}
+        {formData.category === "BR-B1" && (
+          <>
+            <FormControl fullWidth variant="outlined" className="mb-3">
+              <InputLabel>Primary Authority (Dean)</InputLabel>
+              <Select
+                value={formData.primaryAuthority !== "Select" ? formData.primaryAuthority : ""}
+                onChange={(e) => {
+                  setCheckedValues([e.target.value]);
+                  setFormData({...formData, primaryAuthority: e.target.value, secondaryAuthority: "Select"});
+                }}
+                label="Primary Authority (Dean)"
+              >
+                {Deans.map(dean => (
+                  <MenuItem key={dean} value={dean}>{dean}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            <FormControl fullWidth variant="outlined" className="mb-3" 
+              disabled={formData.primaryAuthority === "Select"}
+            >
+              <InputLabel>Secondary Authority</InputLabel>
+              <Select
+                value={formData.secondaryAuthority !== "Select" ? formData.secondaryAuthority : ""}
+                onChange={(e) => {
+                  setFormData({...formData, secondaryAuthority: e.target.value});
+                  if (formData.primaryAuthority !== "Select") {
+                    setCheckedValues([formData.primaryAuthority, e.target.value]);
+                  }
+                }}
+                label="Secondary Authority"
+              >
+                <MenuItem value="REGISTRAR">REGISTRAR</MenuItem>
+                <ListSubheader>Associate Deans</ListSubheader>
+                {AssociateDeans.map(assocDean => (
+                  <MenuItem key={assocDean} value={assocDean}>{assocDean}</MenuItem>
+                ))}
+                <ListSubheader>Heads of Departments</ListSubheader>
+                {Hods.map(hod => (
+                  <MenuItem key={hod} value={hod}>
+                  <div style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}>{hod}</div>
+                </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {formData.primaryAuthority !== "Select" && formData.secondaryAuthority !== "Select" && (
+              <div className="mt-2 text-sm text-blue-600">
+                <i className="fas fa-info-circle"></i> Request will be sent to both {formData.primaryAuthority} and {formData.secondaryAuthority}
+              </div>
+            )}
+          </>
+        )}
+        
+        {/* BR-B2: Using Clean Dropdown (disabled) */}
+        {formData.category === "BR-B2" && (
+          <FormControl fullWidth variant="outlined" className="mb-4">
+            <InputLabel>Approving Authority</InputLabel>
+            <Select
+              value="CHAIRMAN"
+              label="Approving Authority"
+              disabled
+            >
+              <MenuItem value="CHAIRMAN">CHAIRMAN</MenuItem>
+            </Select>
+            <div className="mt-2 text-sm text-blue-600">
+              <i className="fas fa-info-circle"></i> Request will be sent to the Chairman
+            </div>
+          </FormControl>
+        )}
+      </div>
+    )}
             {(formData.category === "ES-B" ||
               formData.category === "BR-B1" ||
               formData.category === "BR-B2") && (
@@ -899,29 +1357,22 @@ function ReservationForm() {
 
               {Array.from(files).length > 0 ? (
                 <div className="flex flex-col  overflow-y-auto max-w-[30rem] h-16 gap-2 pr-2">
-                  {Array.from(files).map((file, index) => {
-                    const arr = file.name.split(".");
-                    const ext = arr[arr.length - 1];
-                    return (
-                      <div className="flex gap-4 items-center">
-                        <div className="w-7">
+                  {Array.from(files).map((file, index) => (
+                    <div
+                      key={index}
+                      className="p-2 rounded-md bg-gray-100 flex gap-2 items-center"
+                    >
+                      <div className="w-8 h-8">
                           <FileIcon
-                            className=""
-                            extension={ext}
-                            {...defaultStyles}
+                          extension={file.name.split(".").pop()}
+                          {...defaultStyles[file.name.split(".").pop()]}
                           />
                         </div>
-                        <div
-                          onClick={() => {
-                            window.open(window.URL.createObjectURL(file));
-                          }}
-                          className="text-sm text-gray-500 hover:text-blue-500 cursor-pointer"
-                        >
+                      <span className="text-sm truncate max-w-[150px]">
                           {file.name}
+                      </span>
                         </div>
-                      </div>
-                    );
-                  })}
+                  ))}
                 </div>
               ) : formData.category === "ES-A" || formData.category === "ES-B" ? (
                 <div className="flex items-center text-gray-500">
