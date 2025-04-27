@@ -1465,7 +1465,12 @@ export const checkoutReservation = async (req, res) => {
         .json({ message: "You are not authorized to perform this action" });
 
     const { id } = req.params;
+    // console.log("params", req.params);
+    // console.log("id", id);
+    const {departureDate} = req.body; // Get departureDate from request body
+    console.log("departureDate", departureDate);
     const reservation = await Reservation.findById(id);
+    // console.log("res:", reservation);
     if (reservation.payment.status !== "PAID") {
       return res.status(400).json({ message: "Payment not completed" });
     }
@@ -1490,6 +1495,23 @@ export const checkoutReservation = async (req, res) => {
     }
 
     reservation.checkOut = true;
+    if(departureDate){
+
+    reservation.departureDate = new Date(departureDate); // Important: Convert to Date type
+    }
+    const category = reservation.category;
+    const roomType = reservation.roomType;
+    const numberOfRooms = reservation.numberOfRooms;
+    const arrivalDate = reservation.arrivalDate; // Get departureDate from request body
+    const ms = Number(
+      new Date(departureDate).getTime() - new Date(arrivalDate).getTime()
+    );
+    //console.log(ms);
+
+    const days = Number(ms / (1000 * 60 * 60 * 24));
+    console.log("days", days);
+    const room_cost = calculateRoomCost(category, roomType, numberOfRooms, days);
+    reservation.payment.amount = room_cost; // Update the payment amount
     await appendReservationToSheetAfterCheckout(reservation);
     await reservation.save();
     console.log("check res:", reservation);
@@ -1505,19 +1527,39 @@ export const checkinReservation = async (req, res) => {
       return res
         .status(403)
         .json({ message: "You are not authorized to perform this action" });
+    const { arrivalDate } = req.body; // Get arrivalDate from request body
 
-    const { id } = req.params;
-    const reservation = await Reservation.findById(id);
-    const now = new Date();
+    const reservation = await Reservation.findById(req.params.id);
 
-    reservation.checkedIn = true;
-    reservation.arrivalDate = now;
-    // await appendReservationToSheetAfterCheckout(reservation);
-    await reservation.save();
-    console.log("check res:", reservation);
-    res.status(200).json({ message: "Checkin successful" });
+    if (!reservation) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+
+    // Update the arrivalDate if provided
+    if (arrivalDate) {
+      reservation.arrivalDate = new Date(arrivalDate); // Important: Convert to Date type
+    }
+
+    reservation.checkedIn = true; // Mark user as checked in
+    const category = reservation.category;
+    const roomType = reservation.roomType;
+    const numberOfRooms = reservation.numberOfRooms;
+    const departureDate = reservation.departureDate; // Get departureDate from request body
+    const ms = Number(
+      new Date(departureDate).getTime() - new Date(arrivalDate).getTime()
+    );
+    //console.log(ms);
+
+    const days = Number(ms / (1000 * 60 * 60 * 24));
+    console.log("days", days);
+    const room_cost = calculateRoomCost(category, roomType, numberOfRooms, days);
+    reservation.payment.amount = room_cost; // Update the payment amount
+    await reservation.save(); // Save the updated reservation
+
+    res.status(200).json({ message: "User checked in successfully" });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -1722,7 +1764,7 @@ function calculateRoomCost(category, roomType, numberOfRooms, days) {
     default:
       baseCost = 0;
   }
-  
+  const totalDays = Math.ceil(days);
   // Calculate total cost
-  return baseCost * numberOfRooms * days;
+  return baseCost * numberOfRooms * totalDays;
 }
