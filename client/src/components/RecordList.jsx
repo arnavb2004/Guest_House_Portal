@@ -27,6 +27,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import FolderIcon from '@mui/icons-material/Folder';
 import DescriptionIcon from '@mui/icons-material/Description';
 import JSZip from 'jszip';
+import { Stack } from "@mui/material";
+
 import { 
   Typography,
   FormControl,
@@ -36,6 +38,7 @@ import {
 } from '@mui/material';
 import InputFileUpload from "../components/uploadFile";
 import { FileIcon, defaultStyles } from "react-file-icon";
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 export default function RecordList({ status = "pending", desc }) {
   const [checked, setChecked] = useState([]);
@@ -68,7 +71,20 @@ export default function RecordList({ status = "pending", desc }) {
     "Departure Date": "departureDate",
     "Room Type": "roomType",
   };
+  const AssociateDeans = [
+    "ASSOCIATE DEAN HOSTEL MANAGEMENT",
+    "ASSOCIATE DEAN INTERNATIONAL RELATIONS AND ALUMNI AFFAIRS",
+    "ASSOCIATE DEAN CONTINUING EDUCATION AND OUTREACH ACTIVITIES",
+    "ASSOCIATE DEAN INFRASTRUCTURE",
+  ];
 
+  const Deans = [
+    "DEAN RESEARCH AND DEVELOPMENT",
+    "DEAN STUDENT AFFAIRS",
+    "DEAN FACULTY AFFAIRS AND ADMINISTRATION",
+    "DEAN UNDER GRADUATE STUDIES",
+    "DEAN POST GRADUATE STUDIES",
+  ];
   const navigate = useNavigate();
   const isAdminOrChairman = user.role === "ADMIN" || user.role === "CHAIRMAN";
 
@@ -260,7 +276,19 @@ export default function RecordList({ status = "pending", desc }) {
   }, [sortToggle, sortType]);
 
   const handleEditClick = (record) => {
-    setEditFormData(record); // Pre-fill the form with the record data
+    // Pre-fill the form with the record data
+    setEditFormData({
+      ...record,
+      signatureMethod: record.signature ? record.signature.type : 'type', // Default to 'type' if no signature
+      signatureText: record.signature && record.signature.type === 'text' ? record.signature.data : '',
+      // For BR-B1 category with special handling
+      primaryDean: record.category === "BR-B1" && record.approvers ? 
+                  (record.approvers.find(a => a.role === "DEAN")?.subrole || "") : "",
+      secondaryAuthority: record.category === "BR-B1" ? record.secondaryAuthority || "" : "",
+      // For other categories
+      authority: record.category !== "BR-B1" && record.approvers && record.approvers.length > 0 ? 
+                record.approvers[0].role : ""
+    });
     setOpenEditDialog(true);
   };
 
@@ -283,6 +311,31 @@ export default function RecordList({ status = "pending", desc }) {
       // Append payment source if exists
       if (editFormData.source) {
         formData.append('source', editFormData.source);
+      }
+      
+      // Append authority information
+      if (editFormData.category === "BR-B1") {
+        if (editFormData.primaryDean) {
+          formData.append('primaryDean', editFormData.primaryDean);
+        }
+        if (editFormData.secondaryAuthority) {
+          formData.append('secondaryAuthority', editFormData.secondaryAuthority);
+        }
+      } else if (editFormData.authority) {
+        formData.append('authority', editFormData.authority);
+      }
+      
+      // Append signature information
+      if (editFormData.signatureMethod === 'type' && editFormData.signatureText) {
+        formData.append('signature[type]', 'text');
+        formData.append('signature[data]', editFormData.signatureText);
+      } else if (editFormData.signatureMethod === 'upload' && editFormData.signatureImage) {
+        formData.append('signature[type]', 'image');
+        formData.append('signature[data]', editFormData.signatureImage);
+      } else if (editFormData.signature) {
+        // Preserve existing signature if no changes
+        formData.append('signature[type]', editFormData.signature.type);
+        formData.append('signature[data]', editFormData.signature.data);
       }
 
       // Append each file
@@ -791,6 +844,190 @@ export default function RecordList({ status = "pending", desc }) {
               </div>
             </>
           )}
+          
+          {/* Approving Authority Section */}
+          <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
+            Approving Authority
+          </Typography>
+          {editFormData.category === "BR-B1" ? (
+            <div>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Dean</InputLabel>
+                <Select
+                  value={editFormData.primaryDean || ""}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, primaryDean: e.target.value })
+                  }
+                >
+                  <MenuItem value="Select" disabled>Select Dean</MenuItem>
+                  <MenuItem value="DEAN RESEARCH AND DEVELOPMENT">Research and Development</MenuItem>
+                  <MenuItem value="DEAN STUDENT AFFAIRS">Student Affairs</MenuItem>
+                  <MenuItem value="DEAN FACULTY AFFAIRS AND ADMINISTRATION">Faculty Affairs & Administration</MenuItem>
+                  <MenuItem value="DEAN UNDER GRADUATE STUDIES">Under Graduate Studies</MenuItem>
+                  <MenuItem value="DEAN POST GRADUATE STUDIES">Post Graduate Studies</MenuItem>
+                </Select>
+              </FormControl>
+              
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Secondary Authority</InputLabel>
+                <Select
+                  value={editFormData.secondaryAuthority || "Select"}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, secondaryAuthority: e.target.value })
+                  }
+                >
+                  <MenuItem value="Select" disabled>Select Secondary Authority</MenuItem>
+                  <MenuItem value="REGISTRAR">Registrar</MenuItem>
+                  
+                  {/* Associate Deans */}
+                  <MenuItem value="ASSOCIATE DEAN HOSTEL MANAGEMENT">Associate Dean - HOSTEL MANAGEMENT</MenuItem>
+                  <MenuItem value="ASSOCIATE DEAN INTERNATIONAL RELATIONS AND ALUMNI AFFAIRS">Associate Dean - INTERNATIONAL RELATIONS AND ALUMNI AFFAIRS</MenuItem>
+                  <MenuItem value="ASSOCIATE DEAN CONTINUING EDUCATION AND OUTREACH ACTIVITIES">Associate Dean - CONTINUING EDUCATION AND OUTREACH ACTIVITIES</MenuItem>
+                  <MenuItem value="ASSOCIATE DEAN INFRASTRUCTURE">Associate Dean - INFRASTRUCTURE</MenuItem>
+                  
+                  {/* HODs */}
+                  <MenuItem value="HOD COMPUTER SCIENCE">HoD - COMPUTER SCIENCE</MenuItem>
+                  <MenuItem value="HOD ELECTRICAL ENGINEERING">HoD - ELECTRICAL ENGINEERING</MenuItem>
+                  <MenuItem value="HOD MECHANICAL ENGINEERING">HoD - MECHANICAL ENGINEERING</MenuItem>
+                  <MenuItem value="HOD CHEMISTRY">HoD - CHEMISTRY</MenuItem>
+                  <MenuItem value="HOD MATHEMATICS">HoD - MATHEMATICS</MenuItem>
+                  <MenuItem value="HOD PHYSICS">HoD - PHYSICS</MenuItem>
+                  <MenuItem value="HOD HUMANITIES AND SOCIAL SCIENCES">HoD - HUMANITIES AND SOCIAL SCIENCES</MenuItem>
+                  <MenuItem value="HOD BIOMEDICAL ENGINEERING">HoD - BIOMEDICAL ENGINEERING</MenuItem>
+                  <MenuItem value="HOD CHEMICAL ENGINEERING">HoD - CHEMICAL ENGINEERING</MenuItem>
+                  <MenuItem value="HOD METALLURGICAL AND MATERIALS ENGINEERING">HoD - METALLURGICAL AND MATERIALS ENGINEERING</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
+          ) : editFormData.category === "ES-A" ? (
+            <>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Authority</InputLabel>
+              <Select
+                value={editFormData.authority || ""}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, authority: e.target.value,concernedDean: "",})
+                }
+              >
+                <MenuItem value="DIRECTOR">Director</MenuItem>
+                <MenuItem value="DEAN">Concerned Dean</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* --- 3. Conditionally render the “which dean?” select --- */}
+
+            {editFormData.authority === "DEAN" && (
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Which Dean?</InputLabel>
+                <Select
+                  value={editFormData.concernedDean || ""}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      concernedDean: e.target.value,
+                    })
+                  }
+                >
+                  <MenuItem value="" disabled>
+                    Select Dean
+                  </MenuItem>
+                  <MenuItem value="DEAN RESEARCH AND DEVELOPMENT">
+                    Research and Development
+                  </MenuItem>
+                  <MenuItem value="DEAN STUDENT AFFAIRS">Student Affairs</MenuItem>
+                  <MenuItem value="DEAN FACULTY AFFAIRS AND ADMINISTRATION">
+                    Faculty Affairs & Administration
+                  </MenuItem>
+                  <MenuItem value="DEAN UNDER GRADUATE STUDIES">
+                    Under Graduate Studies
+                  </MenuItem>
+                  <MenuItem value="DEAN POST GRADUATE STUDIES">
+                    Post Graduate Studies
+                  </MenuItem>
+                </Select>
+              </FormControl>
+            )}
+            </>
+
+          ) : editFormData.category === "BR-A" ? (
+            <>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Authority</InputLabel>
+              <Select
+                value={editFormData.authority || ""}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, authority: e.target.value })
+                }
+              >
+                <MenuItem value="REGISTRAR">Registrar</MenuItem>
+                <MenuItem value="DEAN ASSOCIATE">Dean + Associate Dean</MenuItem>
+                <MenuItem value="DIRECTOR">Director</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* 2) If they chose DEAN ASSOCIATE, show two dropdowns */}
+            {editFormData.authority === "DEAN ASSOCIATE" && (
+              <Stack spacing={2} sx={{ mt: 1 }}>
+                {/* Dean */}
+                <FormControl fullWidth margin="normal">
+                  <InputLabel>Which Dean?</InputLabel>
+                  <Select
+                    value={editFormData.selectedDean}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, selectedDean: e.target.value })
+                    }
+                  >
+                    <MenuItem value="" disabled>
+                      Select Dean
+                    </MenuItem>
+                    {Deans.map((d) => (
+                      <MenuItem key={d} value={d}>
+                        {d}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {/* Associate Dean */}
+                <FormControl fullWidth margin="normal">
+                  <InputLabel>Which Associate Dean?</InputLabel>
+                  <Select
+                    value={editFormData.selectedAssociateDean}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        selectedAssociateDean: e.target.value,
+                      })
+                    }
+                  >
+                    <MenuItem value="" disabled>
+                      Select Associate Dean
+                    </MenuItem>
+                    {AssociateDeans.map((ad) => (
+                      <MenuItem key={ad} value={ad}>
+                        {ad}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+            )}
+          </>
+
+          ) : (
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Authority</InputLabel>
+              <Select
+                value={editFormData.authority || ""}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, authority: e.target.value })
+                }
+              >
+                <MenuItem value="CHAIRMAN">Chairman</MenuItem>
+              </Select>
+            </FormControl>
+          )}
+          
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenEditDialog(false)}>Cancel</Button>
