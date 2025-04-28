@@ -287,9 +287,14 @@ export async function createReservation(req, res) {
 
     let revArray = reviewersArray.map((reviewer) => reviewer.role);
 
+    const emails = [email];
+    for(let i = 0; i < reviewersArray.length; i++){
+      const user = await User.findOne({ role: reviewersArray[i].role });
+      if(user) emails.push(user.email);
+    }
     
     sendVerificationEmail(
-      email,
+      emails,
       "New Reservation Request",
       "<div>A new reservation request has been made.</div><br><br><div>Guest Name: " +
         guestName +
@@ -926,7 +931,14 @@ const updateReservationStatus = async (reservation) => {
     reservation.status = "PENDING";
   }
   // Update stepsCompleted as count of approvals
-  reservation.stepsCompleted = reservation.reviewers.filter((r) => r.status === "APPROVED").length;
+  const adminReviewer = reservation.reviewers.find(r => r.role === "ADMIN");
+if (adminReviewer && adminReviewer.status === "APPROVED") {
+  reservation.stepsCompleted = 2;
+} else {
+  reservation.stepsCompleted = 1;
+}
+
+  
   if (initStatus !== reservation.status) {
     try {
       const user = await User.findOne({ email: userEmail });
