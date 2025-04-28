@@ -47,10 +47,13 @@ const RoomDataList = () => {
       const roomTypeLower = room.roomType?.toLowerCase();
       if (occupancyFilter === "single" && !roomTypeLower.includes("single")) return false;
       if (occupancyFilter === "double" && !roomTypeLower.includes("double")) return false;
+      if (occupancyFilter === "suite" && !roomTypeLower.includes("suite")) return false;
+      if (occupancyFilter === "executive" && !roomTypeLower.includes("executive")) return false;
       if (occupancyFilter === "single suite" && !roomTypeLower.includes("single suite")) return false;
         if (occupancyFilter === "double suite" && !roomTypeLower.includes("double suite")) return false;
         if (occupancyFilter === "single executive" && !roomTypeLower.includes("single executive")) return false;
         if (occupancyFilter === "double executive" && !roomTypeLower.includes("double executive")) return false;
+
         
     }
     if (searchQuery && !room.roomNumber.toString().toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -112,6 +115,8 @@ const RoomDataList = () => {
           className="border rounded-lg p-2 w-1/4"
         >
           <option value="all">All Rooms</option>
+          <option value="suite">Suite Room</option>
+          <option value="executive">Executive Room</option>
           <option value="single">Single Occupancy</option>
           <option value="double">Double Occupancy</option>
           <option value="single suite">Single Suite</option>

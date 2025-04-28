@@ -427,11 +427,6 @@ export async function withdrawApplication(req, res) {
         <div>Number of Rooms: ${reservation.numberOfRooms}</div>
         <div>Room Type: ${reservation.roomType}</div>
         <div>Purpose: ${reservation.purpose}</div>
-        <div>Arrival Date: ${new Date(reservation.arrivalDate).toISOString().split("T")[0]}</div>
-        <div>Arrival Time: ${reservation.arrivalTime}</div>
-        <div>Departure Date: ${new Date(reservation.departureDate).toISOString().split("T")[0]}</div>
-        <div>Departure Time: ${reservation.departureTime}</div>
-        <div>Address: ${reservation.address}</div>
         <div>Category: ${reservation.category}</div>`
       );
     // }
@@ -998,9 +993,7 @@ export const sendReminder = async (req, res) => {
         <div>Room Type: ${reservation.roomType}</div>
         <div>Purpose: ${reservation.purpose}</div>
         <div>Arrival Date: ${new Date(reservation.arrivalDate).toISOString().split("T")[0]}</div>
-        <div>Arrival Time: ${reservation.arrivalTime}</div>
         <div>Departure Date: ${new Date(reservation.departureDate).toISOString().split("T")[0]}</div>
-        <div>Departure Time: ${reservation.departureTime}</div>
         <div>Address: ${reservation.address}</div>
         <div>Category: ${reservation.category}</div>
         <div>Payment Amount: ${reservation.payment.amount}</div>`
@@ -1034,9 +1027,7 @@ export const sendReminderAll = async (req, res) => {
         <div>Room Type: ${reservation.roomType}</div>
         <div>Purpose: ${reservation.purpose}</div>
         <div>Arrival Date: ${new Date(reservation.arrivalDate).toISOString().split("T")[0]}</div>
-        <div>Arrival Time: ${reservation.arrivalTime}</div>
         <div>Departure Date: ${new Date(reservation.departureDate).toISOString().split("T")[0]}</div>
-        <div>Departure Time: ${reservation.departureTime}</div>
         <div>Address: ${reservation.address}</div>
         <div>Category: ${reservation.category}</div>
         <div>Payment Amount: ${reservation.payment.amount}</div>`
@@ -1425,6 +1416,48 @@ export const updateRooms = async (req, res) => {
         message: `Insufficient rooms allotted. Guest requested ${RoomsRequest} rooms, but only ${allottedRooms.length} assigned.`,
       });
     }
+    const roomNumbers = updatedReservation.bookings.map(booking => booking.roomNumber).join(", ");
+
+    // sendVerificationEmail(
+    //   [updatedReservation.guestEmail],
+    //   "Room Assignment Updated",
+    //   `<div>Your room assignment has been updated.</div><br><br>
+    //   <div>Guest Name: ${updatedReservation.guestName}</div>
+    //     <div>Guest Email: ${updatedReservation.guestEmail}</div>
+    //     <div>Number of Guests: ${updatedReservation.numberOfGuests}</div>
+    //     <div>Number of Rooms: ${updatedReservation.numberOfRooms}</div>
+    //     <div>Room Type: ${updatedReservation.roomType}</div>
+    //     <div>Purpose: ${updatedReservation.purpose}</div>
+    //     <div>Arrival Date: ${new Date(updatedReservation.arrivalDate).toISOString().split("T")[0]}</div>
+    //     <div>Departure Date: ${new Date(updatedReservation.departureDate).toISOString().split("T")[0]}</div>
+    //     <div>Address: ${updatedReservation.address}</div>
+    //     <div>Category: ${updatedReservation.category}</div>`
+    //     `<div>Room Numbers: ${roomNumbers}</div>`
+    // )
+    sendVerificationEmail(
+      [updatedReservation.guestEmail],
+      "Room Assignment Updated",
+      "<div>Your room assignment has been updated.</div><br><br><div>Guest Name: " +
+        updatedReservation.guestName +
+        "</div><br><div>Number of Guests: " +
+        updatedReservation.numberOfGuests +
+        "</div><br><div>Number of Rooms: " +
+        updatedReservation.numberOfRooms +
+        "</div><br><div>Room Type: " +
+        updatedReservation.roomType +
+        "</div><br><div>Purpose: " +
+        updatedReservation.purpose +
+        "</div><br><div>Arrival Date: " +
+        getDate(updatedReservation.arrivalDate) +
+        "</div><br><div>Departure Date: " +
+        getDate(updatedReservation.departureDate) +
+        "</div><br><div>Category: " +
+        updatedReservation.category +
+        "</div>" +
+        "<br><div>Room Numbers: " +
+        roomNumbers +
+        "</div>"
+    );
     res.status(200).json({
       message: "Rooms and reservation updated successfully",
       reservation: updatedReservation,
