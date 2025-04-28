@@ -601,7 +601,7 @@ export default function AdminRecordList({ status = "pending" }) {
                         }}
                       />
                     </IconButton>
-                    { status !== "approved" && isAdminOrChairman && (
+                    { status === "pending" && isAdminOrChairman && (
                       <IconButton size="small">
                         <DoneIcon
                           className="text-green-500"

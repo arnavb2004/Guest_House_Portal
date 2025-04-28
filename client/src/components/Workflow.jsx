@@ -18,6 +18,89 @@ const Workflow = ({ id, userRecord, reviewers, setReviewers }) => {
   const reviewer = reviewers.find((reviewer) => reviewer.role === user.role);
   const comments = reviewer?.comments;
   // const stepsCompleted = 2;
+  const [selectedRecordId, setSelectedRecordId] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [selectedRejectReason, setSelectedRejectReason] = useState("0");
+  const [showCustomReasonField, setShowCustomReasonField] = useState(false);
+  const [openRejectDialog, setOpenRejectDialog] = useState(false);
+  const [checked, setChecked] = useState([]);
+  const handleRejectClick = (recordId) => {
+    setSelectedRecordId(recordId);
+    setRejectReason("");
+    setSelectedRejectReason("0");
+    setShowCustomReasonField(false);
+    setOpenRejectDialog(true);
+  };
+
+  const rejectionReasons = [
+    { id: "0", reason: "Select a Reason" },
+    { id: "1", reason: "Room is not available" },
+    { id: "2", reason: "Document uploaded is blurred, please re-upload" },
+    { id: "3", reason: "Document uploaded does not match the provided category" },
+    { id: "4", reason: "Requested dates are not available" },
+    { id: "5", reason: "Incomplete information provided" },
+    { id: "6", reason: "Booking policy violation" },
+    { id: "7", reason: "Duplicate booking request" },
+    { id: "8", reason: "Other" }
+  ];
+
+  const handleReasonChange = (event) => {
+      const value = event.target.value;
+      setSelectedRejectReason(value);
+      
+      if (value === "8") { 
+        setShowCustomReasonField(true);
+        setRejectReason("");
+      } else if (value !== "0") {
+        const selectedReason = rejectionReasons.find(item => item.id === value);
+        setRejectReason(selectedReason.reason);
+        setShowCustomReasonField(false);
+      } else {
+        setRejectReason("");
+        setShowCustomReasonField(false);
+      }
+    };
+  
+    const handleRejectConfirm = async () => {
+      if (selectedRejectReason === "0") {
+        toast.error("Please select a reason for rejection");
+        return;
+      }
+      
+      if (selectedRejectReason === "8" && !rejectReason.trim()) {
+        toast.error("Please provide a custom reason for rejection");
+        return;
+      }
+  
+      try {
+        if (selectedRecordId === null) {
+          // Handle bulk rejection
+          for (const record of checked) {
+            if (record !== "#") {
+              await http.put(`/reservation/reject/${record}`, { reason: rejectReason });
+            }
+          }
+          toast.success("Requests Rejected");
+        } else {
+          // Handle single rejection
+          await http.put(`/reservation/reject/${selectedRecordId}`, { reason: rejectReason });
+          toast.success("Request Rejected");
+        }
+        window.location.reload();
+      } catch (error) {
+        if (error.response?.data?.message) {
+          toast.error(error.response.data);
+        } else {
+          toast.error("An error occurred");
+        }
+      }
+      setOpenRejectDialog(false);
+      setRejectReason("");
+      setSelectedRejectReason("0");
+      setShowCustomReasonField(false);
+      setSelectedRecordId(null);
+    };
+  
   return (
     <div className=" flex flex-col bg-[rgba(255,255,255,0.5)] rounded-lg items-center overflow-x-auto justify-center col-span-3 shadow-lg p-8 gap-10">
       <StepperComponent steps={steps} stepsCompleted={stepsCompleted || 0} />
@@ -103,21 +186,49 @@ const Workflow = ({ id, userRecord, reviewers, setReviewers }) => {
                 Approve
               </button>
               <button
+                // onClick={async () => {
+                //   try {
+                //     await http.put("/reservation/reject/" + id, {
+                //       comments,
+                //     });
+                //     toast.success("Reservation Rejected");
+                //     window.location.reload();
+                //   } catch (error) {
+                //     if (error.response?.data?.message) {
+                //       toast.error(error.response.data);
+                //     } else {
+                //       toast.error("An error occurred");
+                //     }
+                //   }
+                // }}
                 onClick={async () => {
-                  try {
-                    await http.put("/reservation/reject/" + id, {
-                      comments,
-                    });
-                    toast.success("Reservation Rejected");
-                    window.location.reload();
-                  } catch (error) {
-                    if (error.response?.data?.message) {
-                      toast.error(error.response.data);
-                    } else {
-                      toast.error("An error occurred");
+                  const trimmedComment = (comments || "").trim();
+                  const lowerComment = trimmedComment.toLowerCase();
+                
+                  const isPlaceholderComment = 
+                    lowerComment === "form edited by user" || 
+                    lowerComment === "write any review or comments" || 
+                    lowerComment === "";
+                
+                  if (!isPlaceholderComment) {
+                    // If meaningful comment, reject directly
+                    try {
+                      await http.put(`/reservation/reject/${id}`, { reason: trimmedComment });
+                      toast.success("Reservation Rejected");
+                      window.location.reload();
+                    } catch (error) {
+                      if (error.response?.data?.message) {
+                        toast.error(error.response.data.message);
+                      } else {
+                        toast.error("An error occurred");
+                      }
                     }
+                  } else {
+                    // If placeholder comment, open the reject popup
+                    handleRejectClick(id);
                   }
                 }}
+                
                 className="border rounded-lg p-3 px-4 bg-red-400 hover:bg-red-500"
               >
                 Reject
@@ -147,7 +258,7 @@ const Workflow = ({ id, userRecord, reviewers, setReviewers }) => {
       </div>
       <div className="w-full">
         {user.role !== "USER" &&
-          user.role !== "ADMIN" &&
+          // user.role !== "ADMIN" &&
           user.role !== "CASHIER" && (
             <textarea
               // disabled={user.role !== "ADMIN"}
@@ -167,6 +278,57 @@ const Workflow = ({ id, userRecord, reviewers, setReviewers }) => {
             ></textarea>
           )}
       </div>
+      {openRejectDialog && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+    <div className="bg-white p-6 rounded-lg w-[90%] md:w-[30rem] flex flex-col gap-4">
+      <h2 className="text-lg font-semibold">Reject Reason</h2>
+
+      <select
+        value={selectedRejectReason}
+        onChange={handleReasonChange}
+        className="p-2 border rounded-lg"
+      >
+        {rejectionReasons.map((reason) => (
+          <option key={reason.id} value={reason.id}>
+            {reason.reason}
+          </option>
+        ))}
+      </select>
+
+      {showCustomReasonField && (
+        <textarea
+          placeholder="Enter custom reason"
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          className="p-2 border rounded-lg"
+          rows={4}
+        ></textarea>
+      )}
+
+      <div className="flex justify-end gap-4 mt-4">
+        <button
+          onClick={() => {
+            setOpenRejectDialog(false);
+            setSelectedRecordId(null);
+            setSelectedRejectReason("0");
+            setRejectReason("");
+            setShowCustomReasonField(false);
+          }}
+          className="px-4 py-2 rounded-lg bg-gray-400 hover:bg-gray-500 text-white"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleRejectConfirm}
+          className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white"
+        >
+          Confirm Reject
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };
