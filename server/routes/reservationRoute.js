@@ -38,6 +38,8 @@ import {
   updateRoomBookings,
   withdrawApplication,
   checkinReservation,
+  updateAdminAnnotations,
+  updateReceipt,
 } from "../controllers/reservation.js";
 
 const Router = express.Router();
@@ -100,7 +102,26 @@ Router.get("/documents/:id", getReservationDocuments);
 Router.get("/rooms", getRooms);
 Router.get("/payment/pending", getPaymentPendingReservations);
 Router.get("/checkout/today", checkoutToday);
-Router.get("/:id", getReservationDetails);
+Router.get("/details/:id", checkAuth, getReservationDetails);
+
+// Admin annotations route - only ADMIN users can update these fields
+Router.put("/admin-annotations/:id", checkAuth, (req, res, next) => {
+  // Only allow ADMIN users to update annotations
+  if (req.user.role !== "ADMIN") {
+    return res.status(403).json({ message: "Unauthorized. Admin access required." });
+  }
+  next();
+}, updateAdminAnnotations);
+
+// Update receipt for an existing reservation
+Router.put("/update-receipt/:id", 
+  checkAuth,
+  checkFileSize, 
+  upload.fields([
+    { name: "receipt", maxCount: 1 },
+  ]), 
+  updateReceipt
+);
 
 Router.put("/checkin/:id", checkinReservation);
 Router.put("/checkout/:id", checkoutReservation);

@@ -58,6 +58,7 @@ export async function createReservation(req, res) {
       roomType,
       purpose,
       guestName,
+      guestGender,
       arrivalDate,
       arrivalTime,
       departureTime,
@@ -68,6 +69,8 @@ export async function createReservation(req, res) {
       subroles,
       applicant,
       source,
+      sourceName,
+      signature,
     } = req.body;
 
     // Validate required fields
@@ -97,6 +100,19 @@ export async function createReservation(req, res) {
     }
     
     console.log("Applicant data:", typeof(applicantData), applicantData);
+
+    // Parse signature JSON if it's a string
+    let signatureData;
+    if (typeof signature === 'string') {
+      try {
+        signatureData = JSON.parse(signature);
+        console.log("Signature data parsed:", signatureData);
+      } catch (err) {
+        console.error("Error parsing signature JSON:", err);
+      }
+    } else {
+      signatureData = signature;
+    }
 
     const email = req.user.email;
     
@@ -133,6 +149,8 @@ export async function createReservation(req, res) {
         comments: "",
         status: "PENDING",
       };
+
+
     }) : [];
     
     console.log("Final reviewers array:", reviewersArray.map(r => r.role));
@@ -269,20 +287,24 @@ export async function createReservation(req, res) {
       guestEmail: email,
       byAdmin: req.user.role === "ADMIN",
       guestName,
+      guestGender,
       address,
       purpose,
       numberOfGuests,
       numberOfRooms,
       roomType,
       arrivalDate: new Date(`${arrivalDate}T${arrivalTime || "13:00"}`),
+      arrivalTime,
       departureDate: new Date(`${departureDate}T${departureTime || "11:00"}`),
+      departureTime,
       category,
       stepsCompleted: 1,
       files: fileids,
-      payment: { source: source, amount: room_cost, paymentId: "" },
+      payment: { source: source, sourceName: sourceName || "", amount: room_cost, paymentId: "" },
       applicant: applicantData,
       reviewers: reviewersArray,
       receipt: receiptid,
+      signature: signatureData,
     });
 
     let revArray = reviewersArray.map((reviewer) => reviewer.role);
@@ -388,6 +410,8 @@ export const updateRoomBookings = async (req, res) => {
   }
 };
 
+
+
 export async function withdrawApplication(req, res) {
   console.log("Withdraw request received for ID:", req.params.id);
   try {
@@ -436,6 +460,8 @@ export async function withdrawApplication(req, res) {
     res.status(500).json({ message: "Failed to withdraw application", error: error.message });
   }
 };
+
+
 
 export async function getAllReservationDetails(req, res) {
   try {
@@ -815,6 +841,8 @@ export const getPendingReservations = async (req, res) => {
   }
 };
 
+
+
 export const getApprovedReservations = async (req, res) => {
   console.log("Getting approved reservations...");
   try {
@@ -854,6 +882,8 @@ export const getApprovedReservations = async (req, res) => {
   }
 };
 
+
+
 export const getRejectedReservations = async (req, res) => {
   try {
     if (req.user.role === "USER") {
@@ -892,6 +922,8 @@ export const getRejectedReservations = async (req, res) => {
   }
 };
 
+
+
 export const updatePaymentStatus = async (req, res) => {
   try {
     const reservation = await Reservation.findById(req.params.id);
@@ -912,6 +944,8 @@ export const updatePaymentStatus = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+
 
 const updateReservationStatus = async (reservation) => {
   let initStatus = reservation.status;
@@ -952,11 +986,18 @@ const updateReservationStatus = async (reservation) => {
   return reservation;
 };
 
+
+
 export const getRooms = async (req, res) => {
-  if (req.user?.role !== "ADMIN")
+  // Allow access to all authority roles (ADMIN, CHAIRMAN, DEAN, HOD, REGISTRAR, DIRECTOR)
+  const authorizedRoles = ["ADMIN", "CHAIRMAN", "DEAN", "HOD", "REGISTRAR", "DIRECTOR", "ASSOCIATE_DEAN"];
+  
+  if (!req.user || !authorizedRoles.includes(req.user.role)) {
     return res
       .status(403)
       .json({ message: "You are not authorized to perform this action" });
+  }
+  
   try {
     const rooms = await Room.find().sort({ roomNumber: 1 });
     console.log("Rooms", rooms);
@@ -965,6 +1006,8 @@ export const getRooms = async (req, res) => {
     res.status(400).json({ success: false, message: err.message });
   }
 };
+
+
 
 export const sendReminder = async (req, res) => {
   const id = req.body.reservationId;
@@ -998,6 +1041,8 @@ export const sendReminder = async (req, res) => {
     res.status(500).json({ message: "Failed to send reminder", error: error.message });
   }
 };
+
+
 
 export const sendReminderAll = async (req, res) => {
   const paymentdetails = req.body.pendingPaymentsDetails;
@@ -1036,6 +1081,8 @@ export const sendReminderAll = async (req, res) => {
   }
 };
 
+
+
 export const removeFromList = async (req, res) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ message: "Unauthorized action" });
@@ -1057,7 +1104,7 @@ export const removeFromList = async (req, res) => {
     // Find the room and remove its booking
     const room = await Room.findOne({ roomNumber });
     if (!room) {
-      throw new Error(`Room ${roomNumber} not found`);
+      throw new Error(`Room with number ${roomNumber} not found`);
     }
     //console.log("room bookings", room.bookings);
     // Remove the booking from the room
@@ -1081,6 +1128,8 @@ export const removeFromList = async (req, res) => {
     res.status(400).json({ message: error.message || "Failed to remove room" });
   }
 };
+
+
 
 
 export const monthlyReport = async (req, res) => {
@@ -1107,7 +1156,9 @@ export const monthlyReport = async (req, res) => {
     let totalCheckedOut = 0;
     let totalPendingPayments = 0;
     let totalPendingPaymentsDetails = [];
-    let categoryData = {}; // Stores data by category
+    let categoryData = {};
+
+ // Stores data by category
 
     reservations.forEach((reservation) => {
       // reservation.bookings.forEach((booking) => {
@@ -1123,6 +1174,8 @@ export const monthlyReport = async (req, res) => {
               checkedOut: 0,
               pendingPaymentsDetails: []
             };
+
+
           }
 
           let revenue = reservation.payment.amount || 0;
@@ -1186,6 +1239,8 @@ export const monthlyReport = async (req, res) => {
   }
 };
 
+
+
 export const getAllRooms = async (req, res) => {
   try {
     const currentDate = new Date();
@@ -1209,6 +1264,8 @@ export const getAllRooms = async (req, res) => {
 
           roomNumber: room.roomNumber
         };
+
+
       }));
 
       // Return room with updated bookings
@@ -1216,6 +1273,8 @@ export const getAllRooms = async (req, res) => {
         ...room._doc,
         bookings: updatedBookings
       };
+
+
     }));
 
     // console.log("Updated rooms with booking details:", updatedRooms);
@@ -1227,6 +1286,8 @@ export const getAllRooms = async (req, res) => {
     res.status(500).json({ message: "Error fetching rooms", error });
   }
 };
+
+
 
 export const addRoom = async (req, res) => {
   if (req.user?.role !== "ADMIN")
@@ -1242,6 +1303,8 @@ export const addRoom = async (req, res) => {
     res.status(400).json({ success: false, message: err.message });
   }
 };
+
+
 
 export const deleteRoom = async (req, res) => {
   if (req.user?.role !== "ADMIN")
@@ -1270,6 +1333,8 @@ export const deleteRoom = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+
 
 async function isDateRangeAvailable(room, startDate, endDate) {
   for (const booking of room.bookings) {
@@ -1431,6 +1496,8 @@ export const updateRooms = async (req, res) => {
 };
 
 
+
+
 export const sendNotification = async (req, res) => {
   try {
     if (req.user.role === "USER") {
@@ -1449,6 +1516,8 @@ export const sendNotification = async (req, res) => {
   }
 };
 
+
+
 export const getCurrentReservations = async (req, res) => {
   try {
     if (req.user.role !== "CASHIER")
@@ -1464,6 +1533,8 @@ export const getCurrentReservations = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+
 export const getPaymentPendingReservations = async (req, res) => {
   try {
     if (req.user.role !== "CASHIER")
@@ -1481,6 +1552,8 @@ export const getPaymentPendingReservations = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+
 export const getCheckedOutReservations = async (req, res) => {
   try {
     if (req.user.role !== "CASHIER")
@@ -1495,6 +1568,8 @@ export const getCheckedOutReservations = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+
 
 export const getLateCheckoutReservations = async (req, res) => {
   try {
@@ -1512,6 +1587,8 @@ export const getLateCheckoutReservations = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+
 
 export const checkoutReservation = async (req, res) => {
   try {
@@ -1562,9 +1639,8 @@ export const checkoutReservation = async (req, res) => {
     const ms = Number(
       new Date(departureDate).getTime() - new Date(arrivalDate).getTime()
     );
-    //console.log(ms);
-
-    const days = Number(ms / (1000 * 60 * 60 * 24));
+    console.log("days", ms);
+    const days = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
     console.log("days", days);
     const room_cost = calculateRoomCost(category, roomType, numberOfRooms, days);
     reservation.payment.amount = room_cost; // Update the payment amount
@@ -1576,6 +1652,8 @@ export const checkoutReservation = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+
 
 export const checkinReservation = async (req, res) => {
   try {
@@ -1604,9 +1682,8 @@ export const checkinReservation = async (req, res) => {
     const ms = Number(
       new Date(departureDate).getTime() - new Date(arrivalDate).getTime()
     );
-    //console.log(ms);
-
-    const days = Number(ms / (1000 * 60 * 60 * 24));
+    console.log("days", ms);
+    const days = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
     console.log("days", days);
     const room_cost = calculateRoomCost(category, roomType, numberOfRooms, days);
     reservation.payment.amount = room_cost; // Update the payment amount
@@ -1618,6 +1695,8 @@ export const checkinReservation = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+
 
 export const checkoutToday = async (req, res) => {
   try {
@@ -1638,6 +1717,8 @@ export const checkoutToday = async (req, res) => {
   }
 };
 
+
+
 export const getDiningAmount = async (req, res) => {
   try {
     const { id } = req.body;
@@ -1657,6 +1738,8 @@ export const getDiningAmount = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+
 
 export async function editReservation(req, res) {
   try {
@@ -1722,6 +1805,11 @@ export async function editReservation(req, res) {
     const roomType = req.body.roomType || existingReservation.roomType;
     const category = req.body.category || existingReservation.category;
     const numberOfRooms = req.body.numberOfRooms || existingReservation.numberOfRooms;
+    const arrivalDate = req.body.arrivalDate || existingReservation.arrivalDate;
+    const arrivalTime = req.body.arrivalTime || existingReservation.arrivalTime;
+    const departureDate = req.body.departureDate || existingReservation.departureDate;
+    const departureTime = req.body.departureTime || existingReservation.departureTime;
+    const signature = req.body.signature || existingReservation.signature;
     const room_cost = calculateRoomCost(category, roomType, numberOfRooms, days);
 
     console.log('Days:', days);
@@ -1783,13 +1871,19 @@ export async function editReservation(req, res) {
       reviewers: reviewersArray,
       files: [...(existingReservation.files || []), ...newFiles],
       receipt: receiptId,  // Use the updated receipt ID
+      arrivalDate: new Date(arrivalDate + 'T' + (arrivalTime || "00:00")),
+      departureDate: new Date(departureDate + 'T' + (departureTime || "00:00")),
+      signature: signature,
       payment: {
         ...existingReservation.payment,
+        sourceName: req.body.sourceName || existingReservation.payment.sourceName || "",
         amount: room_cost,
         status: "PENDING",
         source: req.body.source || existingReservation.payment.source
       }
     };
+
+
 
     // Update the reservation
     const updatedReservation = await Reservation.findByIdAndUpdate(
@@ -1806,6 +1900,66 @@ export async function editReservation(req, res) {
 
   } catch (error) {
     console.error("Error updating reservation:", error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
+
+
+// Add admin annotations to a reservation
+export const updateAdminAnnotations = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      approvalAttached,
+      confirmedRoomNo,
+      entrySerialNo,
+      entryPageNo,
+      entryDate,
+      bookingDate,
+      checkInTime,
+      checkOutTime,
+      remarks 
+    } = req.body;
+
+    // Validate reservation exists
+    const reservation = await Reservation.findById(id);
+    if (!reservation) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+
+    // Update admin annotation fields
+    const annotationUpdate = {
+      adminAnnotation: {
+        approvalAttached: approvalAttached || reservation.adminAnnotation?.approvalAttached || "",
+        confirmedRoomNo: confirmedRoomNo || reservation.adminAnnotation?.confirmedRoomNo || "",
+        entrySerialNo: entrySerialNo || reservation.adminAnnotation?.entrySerialNo || "",
+        entryPageNo: entryPageNo || reservation.adminAnnotation?.entryPageNo || "",
+        entryDate: entryDate || reservation.adminAnnotation?.entryDate,
+        bookingDate: bookingDate || reservation.adminAnnotation?.bookingDate,
+        checkInTime: checkInTime || reservation.adminAnnotation?.checkInTime || "",
+        checkOutTime: checkOutTime || reservation.adminAnnotation?.checkOutTime || "",
+        remarks: remarks || reservation.adminAnnotation?.remarks || "",
+        updatedAt: new Date(),
+        updatedBy: req.user.name || req.user.email || "Admin"
+      }
+    };
+
+    // Update the reservation with admin annotations
+    const updatedReservation = await Reservation.findByIdAndUpdate(
+      id,
+      annotationUpdate,
+      { new: true }
+    );
+
+    console.log('Updated admin annotations:', updatedReservation.adminAnnotation);
+    res.status(200).json({
+      message: "Admin annotations updated successfully",
+      reservation: updatedReservation
+    });
+
+  } catch (error) {
+    console.error("Error updating admin annotations:", error);
     res.status(400).json({ message: error.message });
   }
 };
@@ -1838,3 +1992,41 @@ function calculateRoomCost(category, roomType, numberOfRooms, days) {
   // Calculate total cost
   return baseCost * numberOfRooms * totalDays;
 }
+
+// Update receipt file for an existing reservation
+export const updateReceipt = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate reservation exists
+    const reservation = await Reservation.findById(id);
+    if (!reservation) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+
+    // Check if receipt file was uploaded
+    if (!req.files || !req.files.receipt || !req.files.receipt[0]) {
+      return res.status(400).json({ message: "Receipt file is required" });
+    }
+
+    // Get the new receipt file ID
+    const newReceiptId = req.files.receipt[0].id;
+
+    // Update the reservation with the new receipt
+    const updatedReservation = await Reservation.findByIdAndUpdate(
+      id,
+      { receipt: newReceiptId },
+      { new: true }
+    );
+
+    console.log('Updated receipt for reservation:', id);
+    res.status(200).json({
+      message: "Receipt updated successfully",
+      reservation: updatedReservation
+    });
+
+  } catch (error) {
+    console.error("Error updating receipt:", error);
+    res.status(400).json({ message: error.message });
+  }
+};

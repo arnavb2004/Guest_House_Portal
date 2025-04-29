@@ -39,10 +39,11 @@ const RoomBooking = () => {
   const fetchRooms = async () => {
     try {
       const res = await http.get("/reservation/rooms");
-      const reservation = await http.get("/reservation/" + id);
+      const reservation = await http.get("/reservation/details/" + id);
       setRoomsData(res.data);
       setRoomList(reservation.data.reservation.bookings);
     } catch (error) {
+      console.error("Error fetching rooms:", error);
       toast.error(error.response?.data?.message || "Failed to fetch rooms");
     }
   };

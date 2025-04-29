@@ -20,6 +20,11 @@ const reservationSchema = new mongoose.Schema(
       type: String,
       // required: true,
     },
+    guestGender: {
+      type: String,
+      enum: ["MALE", "FEMALE", "OTHER"],
+      default: "MALE",
+    },
     numberOfGuests: {
       type: Number,
       // required: true,
@@ -36,8 +41,16 @@ const reservationSchema = new mongoose.Schema(
     arrivalDate: {
       type: Date,
     },
+    arrivalTime: {
+      type: String,
+      default: "",
+    },
     departureDate: {
       type: Date,
+    },
+    departureTime: {
+      type: String,
+      default: "",
     },
     purpose: {
       type: String,
@@ -118,6 +131,11 @@ const reservationSchema = new mongoose.Schema(
         required: true,
         default: "GUEST",
       },
+      sourceName: {
+        type: String,
+        trim: true,
+        default: "", // optional: only used when source != "GUEST"
+      },
       status: {
         type: String,
         enum: ["PENDING", "PAID"],
@@ -181,6 +199,65 @@ const reservationSchema = new mongoose.Schema(
     lastModified: {
       type: Date,
       default: Date.now
+    },
+    signature: {
+      type: {
+        type: String,
+        enum: ["text", "image", ""],
+        default: ""
+      },
+      data: {
+        type: String,
+        default: ""
+      }
+    },
+    // Admin annotations for PDF updates
+    adminAnnotation: {
+      approvalAttached: {
+        type: String,
+        enum: ["YES", "NO", ""],
+        default: ""
+      },
+      confirmedRoomNo: {
+        type: String,
+        default: ""
+      },
+      entrySerialNo: {
+        type: String,
+        default: ""
+      },
+      entryPageNo: {
+        type: String,
+        default: ""
+      },
+      entryDate: {
+        type: Date,
+        default: null
+      },
+      bookingDate: {
+        type: Date,
+        default: null
+      },
+      checkInTime: {
+        type: String,
+        default: ""
+      },
+      checkOutTime: {
+        type: String,
+        default: ""
+      },
+      remarks: {
+        type: String,
+        default: ""
+      },
+      updatedAt: {
+        type: Date,
+        default: null
+      },
+      updatedBy: {
+        type: String,
+        default: ""
+      }
     },
   },
   {

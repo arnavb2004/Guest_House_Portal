@@ -11,6 +11,9 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
+  Button,
+  Chip,
   Typography,
   MenuItem,
   ListSubheader,
@@ -46,9 +49,13 @@ function ReservationForm() {
   const [signatureMethod, setSignatureMethod] = useState('none'); // 'none', 'type', 'upload'
   const [signatureText, setSignatureText] = useState('');
   const [signatureImage, setSignatureImage] = useState(null);
+  const [openSourceDialog, setOpenSourceDialog] = useState(false);
+  const [tempSourceName, setTempSourceName] = useState("");
+
 
   const [formData, setFormData] = useState({
     guestName: "",
+    guestGender: "MALE",
     address: "",
     numberOfGuests: "",
     numberOfRooms: "",
@@ -60,6 +67,7 @@ function ReservationForm() {
     purpose: "",
     category: "ES-A",
     source: "GUEST",
+    sourceName: "",
     applicant: {
       name: "",
       designation: "",
@@ -260,6 +268,12 @@ function ReservationForm() {
       setCheckedValues([]);
       setSubRole([]);
     }
+    if (name === "source" && (value === "DEPARTMENT" || value === "OTHERS")) {
+      setTempSourceName("");            // clear out any old text
+      setOpenSourceDialog(true);        // <— open the popup
+    }
+  
+      
     setFormData({
       ...formData,
       [name]: value,
@@ -527,6 +541,24 @@ function ReservationForm() {
       toast.error("Please enter a valid IIT Ropar email address for applicant");
       return;
     }
+    // —————— NEW: require sourceName when source is DEPARTMENT or OTHERS ——————
+    if (
+      (formData.source === "DEPARTMENT" || formData.source === "OTHERS") &&
+      !formData.sourceName.trim()
+    ) {
+      toast.error(
+        `Please specify the ${
+          formData.source === "DEPARTMENT" ? "department" : "other source"
+        }`
+      );
+      // if you want inline helper text:
+      setErrorText((prev) => ({
+        ...prev,
+        sourceName: "This field is required",
+      }));
+      return;
+    }
+    // ————————————————————————————————————————————————————————————————
 
     if (!passed) {
       toast.error("Please Fill All Necessary Fields Correctly.");
@@ -572,12 +604,21 @@ function ReservationForm() {
       Object.entries(formData).forEach(([fieldName, fieldValue]) => {
         if (fieldName === "applicant") {
           formDataToSend.append(fieldName, JSON.stringify(fieldValue));
+        } else if (fieldName === "signature" && fieldValue) {
+          // Signature needs to be stringified just like applicant data
+          formDataToSend.append(fieldName, JSON.stringify(fieldValue));
+        } else if (fieldName === "sourceName") {
+          // Skip sourceName here - we'll handle it separately
+          // This prevents duplicate sourceName entries
         } else {
           // Use the original category value (no mapping)
           formDataToSend.append(fieldName, fieldValue);
         }
       });
-      
+      // Add the free-text sourceName only if source is not GUEST
+      if(formData.source !== "GUEST" && formData.sourceName) {
+        formDataToSend.append("sourceName", formData.sourceName);
+      }
       // Calculate total amount based on room type, number of rooms, and duration
       const arrivalDateTime = new Date(
         `${formData.arrivalDate}T${formData.arrivalTime || "13:00"}`
@@ -969,6 +1010,23 @@ function ReservationForm() {
           </div>
 
           <div>
+            <FormControl fullWidth className="bg-white mb-4">
+              <InputLabel id="gender-label">Guest Gender*</InputLabel>
+              <Select
+                labelId="gender-label"
+                name="guestGender"
+                value={formData.guestGender}
+                onChange={handleChange}
+                label="Guest Gender"
+              >
+                <MenuItem value="MALE">Male</MenuItem>
+                <MenuItem value="FEMALE">Female</MenuItem>
+                <MenuItem value="OTHER">Other</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+
+          <div>
             <TextField
               label="Address"
               error={errorText.address !== ""}
@@ -1331,24 +1389,77 @@ function ReservationForm() {
         )}
       </div>
     )}
-            {(formData.category === "ES-B" ||
-              formData.category === "BR-B1" ||
-              formData.category === "BR-B2") && (
-              <>
-                <label>Payment*:</label>
+              {(formData.category === "ES-B" ||
+                formData.category === "BR-B1" ||
+                formData.category === "BR-B2") && (
+                <>
+                  <label>Payment*:</label>
+                  <select
+                    name="source"
+                    className="w-full h-12 border rounded-md border-gray-300 p-2 mb-5 whitespace-pre"
+                    onChange={handleChange}
+                    value={formData.source}
+                  >
+                    <option value="GUEST">Paid by guest</option>
+                    <option value="DEPARTMENT">Paid by department</option>
+                    <option value="OTHERS">Paid by other sources</option>
+                  </select>
+                  {/* ————————————————————————————— Popup for Department/Other ————————————————————————————— */}
+                  {openSourceDialog && (
+                    <Dialog open onClose={() => setOpenSourceDialog(false)}>
+                      <DialogTitle>
+                        {formData.source === "DEPARTMENT"
+                          ? "Enter Department Name"
+                          : "Specify Other Source"}
+                      </DialogTitle>
+                      <DialogContent>
+                        <TextField
+                          autoFocus
+                          margin="dense"
+                          fullWidth
+                          label={formData.source === "DEPARTMENT" ? "Department" : "Source"}
+                          value={tempSourceName}
+                          onChange={e => {
+                            setTempSourceName(e.target.value);
+                            setErrorText((p) => ({ ...p, sourceName: "" })); 
+                          }}      
+                          error={!!errorText.sourceName}
+                          helperText={errorText.sourceName}                                          
+                        />
+                      </DialogContent>
+                      <DialogActions>
+                        <Button onClick={() => setOpenSourceDialog(false)}>Cancel</Button>
+                        <Button
+                          onClick={() => {
+                            if (!tempSourceName.trim()) {
+                              setErrorText((p) => ({ ...p, sourceName: "This field is required" }));
+                              return;
+                            }                        
+                            setFormData(prev => ({ ...prev, sourceName: tempSourceName }));
+                            setOpenSourceDialog(false);
+                            setErrorText((p) => ({ ...p, sourceName: "" })); 
+                          }}
+                          variant="contained"
+                        >
+                          Save
+                        </Button>
+                      </DialogActions>
+                    </Dialog>
+                  )}
 
-                <select
-                  name="source"
-                  className="w-full h-12 border rounded-md border-gray-300 p-2 mb-5 whitespace-pre"
-                  onChange={handleChange}
-                  value={formData.source}
-                >
-                  <option value="GUEST">Paid by guest</option>
-                  <option value="DEPARTMENT">Paid by department</option>
-                  <option value="OTHERS">Paid by other sources</option>
-                </select>
-              </>
-            )}
+                  {/* show compact chip once saved */}
+                  {formData.sourceName && (
+                    <Chip
+                      label={formData.sourceName}
+                      size="small"
+                      sx={{ mt: 1, mb: 2 }}
+                    />
+                  )}
+                  {/* —————————————————————————————————————————————————————————————————————————————— */}
+
+                </>
+              )}
+
             Add attachements for proof of category (if any):
             <div className="flex mt-2 gap-10">
               <div>

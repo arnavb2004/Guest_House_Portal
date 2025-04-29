@@ -6,10 +6,19 @@ import "react-toastify/dist/ReactToastify.min.css";
 import {
   FormControl,
   Select,
-  MenuItem,
-  Checkbox,
+  Radio,
   TextField,
-  ListSubheader
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Chip,
+  Typography,
+  MenuItem,
+  ListSubheader,
+  InputLabel,
+  FormHelperText
 } from "@mui/material";
 import "./Reservation_Form.css";
 import { updateFilledPDF } from "../utils/generatePDF";
@@ -40,9 +49,13 @@ function AdminReservationForm() {
   const [signatureMethod, setSignatureMethod] = useState('none'); // 'none', 'type', 'upload'
   const [signatureText, setSignatureText] = useState('');
   const [signatureImage, setSignatureImage] = useState(null);
+  const [openSourceDialog, setOpenSourceDialog] = useState(false);
+  const [tempSourceName, setTempSourceName] = useState("");
+
 
   const [formData, setFormData] = useState({
     guestName: "",
+    guestGender: "MALE",
     address: "",
     numberOfGuests: "",
     numberOfRooms: "",
@@ -54,6 +67,7 @@ function AdminReservationForm() {
     purpose: "",
     category: "ES-A",
     source: "GUEST",
+    sourceName: "",
     applicant: {
       name: "",
       designation: "",
@@ -63,6 +77,9 @@ function AdminReservationForm() {
       email: "",
     },
     signature: null, // Add signature property
+    primaryAuthority: "Select",
+    secondaryAuthority: "Select",
+    selectedReviewers: []
   });
 
   const [errorText, setErrorText] = useState({
@@ -80,18 +97,18 @@ function AdminReservationForm() {
   });
 
   const requiredFields = {
-    guestName: false,
-    address: false,
-    numberOfGuests: false,
+    guestName: true,
+    address: true,
+    numberOfGuests: true,
     numberOfRooms: true,
     roomType: true,
     arrivalDate: true,
-    arrivalTime: false,
+    arrivalTime: true,
     departureDate: true,
-    departureTime: false,
+    departureTime: true,
     purpose: true,
     category: true,
-    source: false,
+    source: true,
     applicant: true,
   };
 
@@ -107,6 +124,7 @@ function AdminReservationForm() {
     departureTime: /[\s\S]*/,
     purpose: /[\s\S]*/,
     category: /[\s\S]*/,
+    mobile: /^\d{10}$/,
   };
 
   const categoryInfo = {
@@ -178,14 +196,6 @@ function AdminReservationForm() {
     "Double Occupancy": 1200,
   };
 
-  const catReviewers = {
-    "ES-A": catESAReviewers,
-    "ES-B": catESBReviewers,
-    "BR-A": catBRAReviewers,
-    "BR-B1": catBRB1Reviewers,
-    "BR-B2": catBRB2Reviewers,
-  };
-
   const roomFare = {
     "ES-A": roomFareESA,
     "ES-B": roomFareESB,
@@ -195,52 +205,227 @@ function AdminReservationForm() {
   };
 
   const [checkedValues, setCheckedValues] = useState([]);
+  const [selectedPrimaryReviewer, setSelectedPrimaryReviewer] = useState("Select");
+  const [selectedSecondaryReviewer, setSelectedSecondaryReviewer] = useState("Select");
+  const [validationError, setValidationError] = useState("");
 
   console.log(checkedValues);
   console.log(subRole);
+
+  // Effect to handle category changes and auto-select appropriate authorities
+  useEffect(() => {
+    // Auto-select authorities based on category
+    switch(formData.category) {
+      case "ES-B":
+        // Chairman only - automatically selected
+        setCheckedValues(["CHAIRMAN"]);
+        setFormData(prev => ({
+          ...prev,
+          primaryAuthority: "CHAIRMAN",
+          secondaryAuthority: "Select"
+        }));
+        break;
+        
+      case "BR-B2":
+        // Chairman only - automatically selected
+        setCheckedValues(["CHAIRMAN"]);
+        setFormData(prev => ({
+          ...prev,
+          primaryAuthority: "CHAIRMAN",
+          secondaryAuthority: "Select"
+        }));
+        break;
+        
+      default:
+        // Reset for other categories unless values are already set
+        if (formData.category === "ES-A" || formData.category === "BR-A" || formData.category === "BR-B1") {
+          // Only reset if we're switching to a new category
+          if (!checkedValues.length) {
+            setFormData(prev => ({
+              ...prev,
+              primaryAuthority: "Select",
+              secondaryAuthority: "Select"
+            }));
+          }
+        }
+        break;
+    }
+  }, [formData.category]);
+
+  const handleCategoryChange = (e) => {
+    const newCategory = e.target.value;
+    setFormData({
+      ...formData,
+      category: newCategory,
+    });
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     console.log(name, value);
     if (name === "category") {
-      const reviewers =  [];
-      setCheckedValues(reviewers);
-      setSubRole(Array(reviewers.length).fill("Select"));
+      // Reset reviewers when changing category - don't auto-select any
+      setCheckedValues([]);
+      setSubRole([]);
     }
+    if (name === "source" && (value === "DEPARTMENT" || value === "OTHERS")) {
+      setTempSourceName("");            // clear out any old text
+      setOpenSourceDialog(true);        // <— open the popup
+    }
+  
+      
     setFormData({
       ...formData,
       [name]: value,
     });
   };
+
   const handleCheckboxChange = (event) => {
     const { value, checked } = event.target;
+    
     if (checked) {
-      setCheckedValues([value]); // Only keep the selected reviewer
-      setSubRole([ "Select" ]); // Reset subRole to "Select" for the newly selected reviewer
-      } else {
+      // If checking, handle appropriately based on category:
+      if (formData.category === "ES-A") {
+        // Only allow one authority for ES-A
+        setCheckedValues([value]);
+        setFormData({...formData, primaryAuthority: value});
+      } 
+      else if (formData.category === "BR-A" && value === "DIRECTOR") {
+        // If selecting Director for BR-A, clear any other selections
+        setCheckedValues([value]);
+        setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+      }
+      else if (formData.category === "BR-A" && value === "REGISTRAR") {
+        // If selecting Registrar for BR-A, set as primary and reset secondary
+        setCheckedValues([value]);
+        setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+      }
+      else if (formData.category === "BR-A" && (Deans.includes(value) || AssociateDeans.includes(value))) {
+        // For BR-A, ensure Registrar is still included if selecting a secondary authority
+        if (checkedValues.includes("REGISTRAR")) {
+          setCheckedValues(["REGISTRAR", value]);
+          setFormData({...formData, secondaryAuthority: value});
+        } else {
+          // If no primary yet, treat this as a single selection
+          setCheckedValues([value]);
+          setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+        }
+      }
+      else if (formData.category === "BR-B1") {
+        // For BR-B1, handle Dean + secondary authority
+        if (Deans.includes(value)) {
+          // If selecting a Dean, keep it as primary and clear secondary
+          setCheckedValues([value]);
+          setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+        } 
+        else if (AssociateDeans.includes(value) || Hods.includes(value) || value === "REGISTRAR") {
+          // If selecting a secondary authority, ensure a Dean is still primary
+          const existingDean = checkedValues.find(val => Deans.includes(val));
+          if (existingDean) {
+            setCheckedValues([existingDean, value]);
+            setFormData({...formData, secondaryAuthority: value});
+          } else {
+            // If no Dean selected yet, just keep the current selection
+            setCheckedValues([value]);
+            setFormData({...formData, primaryAuthority: value, secondaryAuthority: "Select"});
+          }
+        }
+      }
+      else {
+        // Default case: add to checked values
+        setCheckedValues([...checkedValues, value]);
+      }
+    } else {
+      // If unchecking (shouldn't happen with radio buttons but keeping as safeguard)
       setCheckedValues([]);
       setSubRole([]);
-
     }
   };
 
-  console.log(checkedValues);
-
-  const handleSubRoleChange = (event, reviewer) => {
-    const index = checkedValues.indexOf(reviewer);
-    const temp = [...subRole];
-    temp[index] = event.target.value;
-    setSubRole(temp);
+  // Function to handle subrole selection
+  const handleSubRoleChange = (event, roleType) => {
+    const selectedSubRole = event.target.value;
+    const roleIndex = checkedValues.indexOf(roleType);
+    
+    if (roleIndex !== -1) {
+      setSubRole((prev) => {
+        const newSubRoles = [...prev];
+        newSubRoles[roleIndex] = selectedSubRole;
+        return newSubRoles;
+      });
+    }
   };
 
   const handleFileUpload = (files) => {
     setFiles(files);
   };
+
+  const buildReviewersList = () => {
+    switch(formData.category) {
+      case "ES-A":
+        // Return the single selected reviewer
+        return checkedValues;
+        
+      case "ES-B":
+      case "BR-B2":
+        // Always Chairman
+        return ["CHAIRMAN"];
+        
+      case "BR-A":
+        if (checkedValues.includes("DIRECTOR")) {
+          // If Director is selected, only Director approves
+          return ["DIRECTOR"];
+        } else if (checkedValues.length > 0 && formData.secondaryAuthority) {
+          // Primary + Secondary authorities
+          return [checkedValues[0], formData.secondaryAuthority];
+        }
+        return checkedValues; // Fallback
+        
+      case "BR-B1":
+        if (checkedValues.length > 0 && formData.secondaryAuthority) {
+          // Dean + Secondary authority
+          return [checkedValues[0], formData.secondaryAuthority];
+        }
+        return checkedValues; // Fallback
+        
+      default:
+        return checkedValues;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Form validation
+
+    //Handle form validation
     let passed = true;
-    
+
+    // Validate mobile number
+    if (!formData.applicant.mobile.match(/^\d{10}$/)) {
+      toast.error("Mobile number must be exactly 10 digits");
+      return;
+    }
+
+    // Calculate max allowed arrival date (today + 3 months)
+    const maxArrivalDate = new Date();
+    maxArrivalDate.setMonth(maxArrivalDate.getMonth() + 3);
+
+    // Get arrival and departure dates
+    const arrivalDateTime = new Date(`${formData.arrivalDate}T${formData.arrivalTime}`);
+    const departureDateTime = new Date(`${formData.departureDate}T${formData.departureTime}`);
+
+    // Check if arrival date is within allowed range
+    if (arrivalDateTime > maxArrivalDate) {
+      toast.error("Booking can only be made up to 3 months in advance");
+      return;
+    }
+
+    // Calculate stay duration in days
+    const stayDuration = (departureDateTime - arrivalDateTime) / (1000 * 60 * 60 * 24);
+    if (stayDuration > 10) {
+      toast.error("Maximum booking duration is 10 days");
+      return;
+    }
+
     for (let [key, value] of Object.entries(formData)) {
       if (key === "files" || key === "receipt") {
         continue;
@@ -251,7 +436,7 @@ function AdminReservationForm() {
           [key]: "This field is required",
         }));
         passed = false;
-      } else if (value !== "" && patterns[key] && !value.match(patterns[key])) {
+      } else if (patterns[key] && !value.match(patterns[key])) {
         setErrorText((prev) => ({
           ...prev,
           [key]: "Invalid input",
@@ -264,14 +449,43 @@ function AdminReservationForm() {
         }));
       }
     }
-    
-    const arrivalDateTime = new Date(
-      `${formData.arrivalDate}T${formData.arrivalTime || "13:00"}`
-    );
-    const departureDateTime = new Date(
-      `${formData.departureDate}T${formData.departureTime || "11:00"}`
-    );
-    
+
+    // Check if no of rooms are Sufficient for Double occupancy
+    if (formData.roomType === "Double Occupancy") {
+      const numberOfGuests = parseInt(formData.numberOfGuests);
+      const numberOfRooms = parseInt(formData.numberOfRooms);
+      if (2 * numberOfRooms < numberOfGuests) {
+        setErrorText((prev) => ({
+          ...prev,
+          numberOfRooms:
+            "Number of rooms are not sufficient as per number of guests and room type",
+        }));
+        passed = false;
+        toast.error(
+          "Number of rooms are not sufficient as per number of guests and room type"
+        );
+        return;
+      }
+    }
+
+    // Check if no of rooms are Sufficient for Single occupancy
+    if (formData.roomType === "Single Occupancy") {
+      const numberOfGuests = parseInt(formData.numberOfGuests);
+      const numberOfRooms = parseInt(formData.numberOfRooms);
+      if (numberOfRooms < numberOfGuests) {
+        setErrorText((prev) => ({
+          ...prev,
+          numberOfRooms:
+            "Number of rooms are not sufficient as per number of guests and room type",
+        }));
+        passed = false;
+        toast.error(
+          "Number of rooms are not sufficient as per number of guests and room type"
+        );
+        return;
+      }
+    }
+
     // Check if departure is after arrival
     if (departureDateTime <= arrivalDateTime) {
       passed = false;
@@ -283,7 +497,30 @@ function AdminReservationForm() {
       toast.error("Departure should be After Arrival");
       return;
     }
-    
+
+    // if (formData.arrivalTime < "13:00") {
+    //   toast.error("Arrival time should be after 01:00 PM");
+    //   return;
+    // }
+
+    if (formData.departureTime > "11:00") {
+      toast.error("Departure time should be before 11:00 AM");
+      return;
+    }
+
+    for (let [key, value] of Object.entries(formData.applicant)) {
+      if (value === "") {
+        passed = false;
+      }
+    }
+    if (checkedValues.length === 0) {
+      toast.error("Please add a reviewer/reviewers");
+      return;
+    }
+
+    console.log(checkedValues);
+    console.log(subRole);
+
     for (let [index, reviewer] of checkedValues.entries()) {
       console.log(subroles[reviewer]);
       console.log(subRole[index]);
@@ -297,30 +534,55 @@ function AdminReservationForm() {
         return;
       }
     }
-    
+
+    if (
+      formData.applicant.email.match("[a-z0-9._%+-]+@iitrpr.ac.in$") === null
+    ) {
+      toast.error("Please enter a valid IIT Ropar email address for applicant");
+      return;
+    }
+    // —————— NEW: require sourceName when source is DEPARTMENT or OTHERS ——————
+    if (
+      (formData.source === "DEPARTMENT" || formData.source === "OTHERS") &&
+      !formData.sourceName.trim()
+    ) {
+      toast.error(
+        `Please specify the ${
+          formData.source === "DEPARTMENT" ? "department" : "other source"
+        }`
+      );
+      // if you want inline helper text:
+      setErrorText((prev) => ({
+        ...prev,
+        sourceName: "This field is required",
+      }));
+      return;
+    }
+    // ————————————————————————————————————————————————————————————————
+
     if (!passed) {
       toast.error("Please Fill All Necessary Fields Correctly.");
       return;
     }
-    
+
+    if (
+      (formData.category === "ES-A" || formData.category === "ES-B") &&
+      Array.from(files).length === 0
+    ) {
+      toast.error("Uploading files is mandatory for category ES-A and ES-B");
+      return;
+    }
+
     // Handle form submission
     setLoading(true);
     
-    // Show loading toast
-    const toast_id = toast.loading("Submitting reservation...");
-
     try {
       // Generate PDF receipt with better error handling
       console.log("Attempting to generate receipt...");
       const receipt = await updateFilledPDF(formData);
       
       if (!receipt) {
-        toast.update(toast_id, {
-          render: "Failed to generate receipt. Please ensure all fields are filled correctly.",
-          type: "error",
-          isLoading: false,
-          autoClose: 5000,
-        });
+        toast.error("Failed to generate receipt. Please ensure all fields are filled correctly.");
         setLoading(false);
         return;
       }
@@ -342,12 +604,21 @@ function AdminReservationForm() {
       Object.entries(formData).forEach(([fieldName, fieldValue]) => {
         if (fieldName === "applicant") {
           formDataToSend.append(fieldName, JSON.stringify(fieldValue));
+        } else if (fieldName === "signature" && fieldValue) {
+          // Signature needs to be stringified just like applicant data
+          formDataToSend.append(fieldName, JSON.stringify(fieldValue));
+        } else if (fieldName === "sourceName") {
+          // Skip sourceName here - we'll handle it separately
+          // This prevents duplicate sourceName entries
         } else {
           // Use the original category value (no mapping)
           formDataToSend.append(fieldName, fieldValue);
         }
       });
-      
+      // Add the free-text sourceName only if source is not GUEST
+      if(formData.source !== "GUEST" && formData.sourceName) {
+        formDataToSend.append("sourceName", formData.sourceName);
+      }
       // Calculate total amount based on room type, number of rooms, and duration
       const arrivalDateTime = new Date(
         `${formData.arrivalDate}T${formData.arrivalTime || "13:00"}`
@@ -378,126 +649,130 @@ function AdminReservationForm() {
         }
       }
       
-      // Add reviewers and subroles based on category-specific requirements
+      // Add reviewers and subroles
       let formattedReviewers = [];
       
-      // Handle specific reviewer categories based on requirements
-      switch(formData.category) {
-        case "ES-A":
-          // ES-A: Director or any Dean
-          formattedReviewers = [...checkedValues];
-          break;
-          
-        case "ES-B":
-          // ES-B: Chairman only
-          formattedReviewers = ["CHAIRMAN"];
-          break;
-          
-        case "BR-A":
-          // BR-A: Either Director alone OR Registrar + (Dean/Associate Dean)
-          if (checkedValues.includes("DIRECTOR")) {
-            formattedReviewers = ["DIRECTOR"];
-          } else if (checkedValues.includes("REGISTRAR") && formData.secondaryAuthority) {
-            formattedReviewers = ["REGISTRAR", formData.secondaryAuthority];
-          }
-          break;
-          
-        case "BR-B1":
-          // BR-B1: Dean + (Associate Dean, HOD, or Registrar)
-          if (checkedValues.length > 0 && formData.secondaryAuthority) {
-            const primaryDean = checkedValues.find(val => Deans.includes(val));
-            if (primaryDean) {
-              formattedReviewers = [primaryDean, formData.secondaryAuthority];
-            }
-          }
-          break;
-          
-        case "BR-B2":
-          // BR-B2: Chairman only
-          formattedReviewers = ["CHAIRMAN"];
-          break;
-          
-        default:
-          // Fallback to checked values for any other category
-          formattedReviewers = [...checkedValues];
+      // Handle specific reviewer cases based on category
+      if (formData.category === "ES-B" || formData.category === "BR-B2") {
+        // Chairman is always the only reviewer for these categories
+        formattedReviewers = ["CHAIRMAN"];
       }
-      
-      // Make sure we have at least one reviewer
-      if (formattedReviewers.length === 0 && checkedValues.length > 0) {
-        // Fallback to the checked values if something went wrong
+      else if (formData.category === "BR-A") {
+        // BR-A has three cases: Director alone, Registrar alone, or Dean + Associate Dean
+        if (checkedValues.includes("DIRECTOR")) {
+          formattedReviewers = ["DIRECTOR"];
+        } 
+        else if (checkedValues.includes("REGISTRAR")) {
+          formattedReviewers = ["REGISTRAR"];
+        }
+        else if (checkedValues.length === 2) {
+          // Dean + Associate Dean case
+          formattedReviewers = [...checkedValues];
+        }
+        else if (checkedValues.length === 1 && Deans.includes(checkedValues[0])) {
+          // Only Dean selected without Associate Dean (incomplete)
+          toast.error("For BR-A with Dean, you must also select an Associate Dean as secondary authority");
+          setLoading(false);
+          return;
+        }
+      }
+      else if (formData.category === "BR-B1" && checkedValues.length === 2) {
+        // For BR-B1, add the primary and secondary authorities
+        formattedReviewers = [...checkedValues];
+      }
+      else {
+        // For other cases, use the checked values directly
         formattedReviewers = [...checkedValues];
       }
       
-      console.log("Sending reviewers:", formattedReviewers);
-      formDataToSend.append("reviewers", formattedReviewers.join(','));
-      formDataToSend.append("subroles", new Array(formattedReviewers.length).fill("Select").join(',')); // For compatibility
+      // Make sure we have at least one reviewer
+      if (formattedReviewers.length === 0) {
+        toast.error("No approving authorities selected. Please select the required authorities.");
+        setLoading(false);
+        return;
+      }
       
-      // Add receipt file
-      formDataToSend.append("receipt", receiptFile);
-
-      console.log("Submitting form data to server...");
+      console.log("Final reviewers to be submitted:", formattedReviewers);
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      // Add reviewers to formData
+      formDataToSend.append('reviewers', formattedReviewers.join(','));
+      
+      // Add empty subroles for compatibility
+      const subrolesArray = new Array(formattedReviewers.length).fill("Select");
+      formDataToSend.append('subroles', subrolesArray.join(','));
+      
+      // Add receipt file (REQUIRED by server)
+      if (!receiptFile) {
+        // Create a dummy receipt file if none is provided
+        const dummyBlob = new Blob(['Receipt placeholder'], { type: 'application/pdf' });
+        const dummyFile = new File([dummyBlob], 'receipt.pdf', { type: 'application/pdf' });
+        formDataToSend.append('receipt', dummyFile);
+      } else {
+        formDataToSend.append('receipt', receiptFile);
+      }
+      
+      // Show loading toast
+      const toast_id = toast.loading("Submitting reservation...");
+      
+      // Submit the form
+      console.log("Submitting form data to server...", [...formDataToSend.entries()].map(([key, value]) => 
+        key === 'receipt' ? `${key}: [File]` : `${key}: ${value instanceof File ? value.name : value}`
+      ));
       
       try {
-        const res = await http.post("/reservation/", formDataToSend, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-          signal: controller.signal
-        });
+        // Set a timeout to handle hanging requests
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
+        );
         
-        clearTimeout(timeoutId);
+        // Race between actual request and timeout
+        const res = await Promise.race([
+          http.post("reservation/", formDataToSend, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }),
+          timeoutPromise
+        ]);
         
+        // Handle response
         console.log("Server response:", res.status, res.data);
-        toast.update(toast_id, {
-          render: "Reservation submitted successfully!",
-          type: "success",
-          isLoading: false,
-          autoClose: 3000,
-        });
-        setLoading(false);
-        navigate("..");
-      } catch (error) {
-        clearTimeout(timeoutId);
-        console.error("Form submission error:", error);
-        
-        if (error.name === 'AbortError') {
+        if (res.status === 200) {
           toast.update(toast_id, {
-            render: "Request timed out. Please try again later.",
-            type: "error",
+            render: "Reservation submitted successfully!",
+            type: "success",
             isLoading: false,
-            autoClose: 5000,
+            autoClose: 3000,
           });
+          setLoading(false);
+          navigate("..");
         } else {
           toast.update(toast_id, {
-            render: error.response?.data?.message || "Network error. Please try again.",
+            render: `Reservation submission failed: ${res.status}`,
             type: "error",
             isLoading: false,
             autoClose: 5000,
           });
+          setLoading(false);
         }
+      } catch (error) {
+        console.error("Form submission network error:", error);
+        toast.update(toast_id, {
+          render: error.message || "Network error. Please try again.",
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
         setLoading(false);
       }
     } catch (error) {
-      console.error("PDF generation error:", error);
-      toast.update(toast_id, {
-        render: "Failed to prepare form. Please try again.",
-        type: "error",
-        isLoading: false,
-        autoClose: 5000,
-      });
+      console.error("Form submission error:", error);
       setLoading(false);
+      toast.error(error.response?.data?.message || "Form submission failed. Please try again.");
     }
   };
 
-  const [showCheckbox, setShowCheckbox] = useState(false);
-
-  useEffect(() => {
-    // setShowCheckbox(false);
-    setShowCheckbox(true);
-  }, [formData.category]);
+  const [showCheckbox, setShowCheckbox] = useState(true);
 
   // Enhanced autofill handler function
   const handleAutofill = () => {
@@ -538,7 +813,7 @@ function AdminReservationForm() {
         mobile: userData.contact || "",
         department: department || prev.applicant.department || "",
         designation: designation || prev.applicant.designation || "",
-        code: userData.employeeId || userData.studentId || userData.ecode || prev.applicant.code || "",
+        code: userData.employeeId || userData.studentId || prev.applicant.code || userData.ecode || "",
       }
     }));
     
@@ -593,14 +868,14 @@ function AdminReservationForm() {
     }
   };
 
-  // Function to parse and display secondary authority values
+  // First, add a helper function to parse and display secondary authority values
   const getSecondaryAuthorityDisplayValue = (value) => {
     if (!value || value === "Select") return "Select Secondary Authority";
     
     if (value === "REGISTRAR") return "Registrar";
     
     // Handle Associate Deans
-    if (value.startsWith("ASSOCIATE DEAN ")) {
+    if (value.startsWith("")) {
       return `Associate Dean - ${value.replace("ASSOCIATE DEAN ", "")}`;
     }
     
@@ -610,6 +885,109 @@ function AdminReservationForm() {
     }
     
     return value;
+  };
+
+  // Function to validate category-specific approval requirements
+  const validateCategoryApproval = () => {
+    const { category, primaryAuthority, secondaryAuthority } = formData;
+    let isValid = true;
+    let errorMessage = "";
+    
+    switch (category) {
+      case "ES-A":
+        // Any one from Director or any Dean
+        if (checkedValues.length === 0 || !catESAReviewers.includes(checkedValues[0])) {
+          errorMessage = "For category ES-A, please select Director or any Dean as approving authority";
+          isValid = false;
+        }
+        break;
+        
+      case "ES-B":
+        // Chairman only - automatically selected, so should always be valid
+        if (checkedValues.length !== 1 || checkedValues[0] !== "CHAIRMAN") {
+          // Auto-select if not already selected
+          setCheckedValues(["CHAIRMAN"]);
+        }
+        break;
+        
+      case "BR-A":
+        // Either Director alone OR Registrar alone OR Dean + Associate Dean
+        if (checkedValues.includes("DIRECTOR")) {
+          // Director only case - valid
+          if (checkedValues.length !== 1) {
+            errorMessage = "For BR-A with Director, only Director should be selected";
+            isValid = false;
+          }
+        } else if (checkedValues.includes("REGISTRAR")) {
+          // Registrar alone - valid
+          if (checkedValues.length !== 1) {
+            errorMessage = "For BR-A with Registrar, no secondary authority should be selected";
+            isValid = false;
+          }
+        } else if (checkedValues.length > 0 && Deans.includes(checkedValues[0])) {
+          // Dean + Associate Dean case
+          if (checkedValues.length !== 2) {
+            errorMessage = "For BR-A with Dean, you must also select an Associate Dean as secondary authority";
+            isValid = false;
+          } else {
+            const secondAuthority = checkedValues.find(val => val !== checkedValues[0]);
+            if (!secondAuthority || !AssociateDeans.includes(secondAuthority)) {
+              errorMessage = "For category BR-A with Dean, secondary authority must be an Associate Dean";
+              isValid = false;
+            }
+          }
+        } else {
+          errorMessage = "For category BR-A, select either Director alone, Registrar alone, or a Dean with an Associate Dean";
+          isValid = false;
+        }
+        break;
+        
+      case "BR-B1":
+        // Any Dean + (any Associate Dean OR any HOD OR Registrar)
+        if (checkedValues.length !== 2) {
+          errorMessage = "For category BR-B1, you must select both a Dean and a secondary authority";
+          isValid = false;
+        } else {
+          // Check if a Dean is selected
+          const selectedDean = checkedValues.find(val => Deans.includes(val));
+          if (!selectedDean) {
+            errorMessage = "For category BR-B1, primary authority must be a Dean";
+            isValid = false;
+          }
+          
+          // Check if secondary authority is valid
+          const secondAuthority = checkedValues.find(val => !Deans.includes(val));
+          if (!secondAuthority || 
+              (!AssociateDeans.includes(secondAuthority) && 
+               !Hods.includes(secondAuthority) && 
+               secondAuthority !== "REGISTRAR")) {
+            errorMessage = "For category BR-B1, secondary authority must be an Associate Dean, HOD, or Registrar";
+            isValid = false;
+          }
+        }
+        break;
+        
+      case "BR-B2":
+        // Chairman only - automatically selected, so should always be valid
+        if (checkedValues.length !== 1 || checkedValues[0] !== "CHAIRMAN") {
+          // Auto-select if not already selected
+          setCheckedValues(["CHAIRMAN"]);
+        }
+        break;
+        
+      default:
+        errorMessage = "Please select a valid category";
+        isValid = false;
+    }
+    
+    if (!isValid) {
+      toast.error(errorMessage);
+      setValidationError(errorMessage);
+    } else {
+      setValidationError("");
+    }
+    
+    return isValid;
   };
 
   return (
@@ -629,6 +1007,23 @@ function AdminReservationForm() {
               value={formData.guestName}
               onChange={handleChange}
             />
+          </div>
+
+          <div>
+            <FormControl fullWidth className="bg-white mb-4">
+              <InputLabel id="gender-label">Guest Gender*</InputLabel>
+              <Select
+                labelId="gender-label"
+                name="guestGender"
+                value={formData.guestGender}
+                onChange={handleChange}
+                label="Guest Gender"
+              >
+                <MenuItem value="MALE">Male</MenuItem>
+                <MenuItem value="FEMALE">Female</MenuItem>
+                <MenuItem value="OTHER">Other</MenuItem>
+              </Select>
+            </FormControl>
           </div>
 
           <div>
@@ -679,11 +1074,12 @@ function AdminReservationForm() {
               value={formData.arrivalDate}
               onChange={handleChange}
               min={new Date(Date.now()).toISOString().split("T")[0]}
+              max={new Date(2999, 11, 31).toISOString().split("T")[0]}
             />
           </div>
 
           <div className="form-group">
-            <label>Arrival Time:</label>
+            <label>Arrival Time:* </label>
             <input
               type="time"
               name="arrivalTime"
@@ -699,11 +1095,12 @@ function AdminReservationForm() {
               value={formData.departureDate}
               onChange={handleChange}
               min={new Date(Date.now()).toISOString().split("T")[0]}
+              max={new Date(2999, 11, 31).toISOString().split("T")[0]}
             />
           </div>
           <div className="form-group">
             <label>
-              Departure Time: (Departure time must be before 11:00 AM)
+              Departure Time*: (Departure time must be before 11:00 AM)
             </label>
             <input
               type="time"
@@ -745,16 +1142,14 @@ function AdminReservationForm() {
             <select
               name="category"
               className="w-full h-12 border rounded-md border-gray-300 p-2 mb-5 whitespace-pre"
-              onChange={handleChange}
+              onChange={handleCategoryChange}
               value={formData.category}
             >
-              {Object.entries(categoryInfo).map(
-                ([categoryCode, categoryName]) => (
-                  <option key={categoryCode} value={categoryCode}>
-                    {categoryName}
-                  </option>
-                )
-              )}
+              {Object.entries(categoryInfo).map(([categoryCode, categoryName]) => (
+                <option key={categoryCode} value={categoryCode}>
+                  {categoryName}
+                </option>
+              ))}
             </select>
             <div className="form-group">
               <label>Room Type*</label>
@@ -786,263 +1181,309 @@ function AdminReservationForm() {
                   )}
                 </option>
               </select>
-
-              </div>
-            {showCheckbox && (
-                <div className="w-full p-2 mb-5">
-                <label className="font-semibold mb-2 block">Approving Authority*:</label>
-                
-                {formData.category === "ES-A" && (
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-600 mb-1">Select one of the following options:</p>
-                    <FormControl fullWidth className="mb-3">
-                      <Select
-                        multiple
-                        value={checkedValues}
-                        onChange={(e) => {
-                          setCheckedValues(e.target.value);
-                        }}
-                        renderValue={(selected) => selected.join(', ')}
-                        MenuProps={{
-                          PaperProps: {
-                            style: {
-                              maxHeight: 300
-                            }
-                          }
-                        }}
-                      >
-                        <MenuItem value="DIRECTOR">Director</MenuItem>
-                        <ListSubheader>Deans</ListSubheader>
-                        {Deans.map(dean => (
-                          <MenuItem key={dean} value={dean}>
-                            {dean.replace("DEAN ", "")}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </div>
-                )}
-                
-                {formData.category === "ES-B" && (
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-600 mb-1">Chairman is the approving authority:</p>
-                    <FormControl fullWidth className="mb-3">
-                      <Select
-                        value={checkedValues.length > 0 ? checkedValues[0] : "CHAIRMAN"}
-                        onChange={(e) => {
-                          setCheckedValues([e.target.value]);
-                        }}
-                        displayEmpty
-                      >
-                        <MenuItem value="CHAIRMAN">Chairman</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </div>
-                )}
-                
-                {formData.category === "BR-A" && (
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-600 mb-1">Select approving authority:</p>
-                    <FormControl fullWidth className="mb-3">
-                      <Select
-                        value={checkedValues.length > 0 ? checkedValues[0] : ""}
-                        onChange={(e) => {
-                          setCheckedValues([e.target.value]);
-                          // If Director is selected, clear secondaryAuthority
-                          if (e.target.value === "DIRECTOR") {
-                            setFormData({...formData, secondaryAuthority: ""});
-                          }
-                        }}
-                        displayEmpty
-                        MenuProps={{
-                          PaperProps: {
-                            style: {
-                              maxHeight: 300
-                            }
-                          }
-                        }}
-                      >
-                        <MenuItem value="" disabled>Select primary authority</MenuItem>
-                        <MenuItem value="REGISTRAR">Registrar</MenuItem>
-                        <MenuItem value="DIRECTOR">Director</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    {/* Show secondary authority field only if Registrar is selected */}
-                    {checkedValues.includes("REGISTRAR") && (
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Select a Dean or Associate Dean (Required):</p>
-                        <FormControl fullWidth>
-                          <Select
-                            value={formData.secondaryAuthority || "Select"}
-                            onChange={(e) => {
-                              setFormData({ ...formData, secondaryAuthority: e.target.value });
-                            }}
-                            displayEmpty
-                            MenuProps={{
-                              PaperProps: {
-                                style: {
-                                  maxHeight: 300
-                                }
-                              }
-                            }}
-                          >
-                            <MenuItem value="Select" disabled>Select secondary authority</MenuItem>
-                            <ListSubheader>Deans</ListSubheader>
-                            {Deans.map((dean) => (
-                              <MenuItem key={dean} value={dean}>
-                                {dean.replace("DEAN ", "")}
-                              </MenuItem>
-                            ))}
-                            <ListSubheader>Associate Deans</ListSubheader>
-                            {AssociateDeans.map((dean) => (
-                              <MenuItem key={dean} value={dean}>
-                                {dean.replace("ASSOCIATE DEAN ", "")}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {formData.category === "BR-B1" && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Select Primary Authority (Dean):</p>
-                    <FormControl fullWidth className="mb-3">
-                      <Select
-                        multiple
-                        value={checkedValues}
-                        onChange={(e) => {
-                          // Filter to only keep Dean roles
-                          const deanValues = e.target.value.filter(value => 
-                            Deans.includes(value)
-                          );
-                          setCheckedValues(deanValues);
-                        }}
-                        renderValue={(selected) => selected.join(', ')}
-                        MenuProps={{
-                          PaperProps: {
-                            style: {
-                              maxHeight: 300
-                            }
-                          }
-                        }}
-                      >
-                        {Deans.map(dean => (
-                          <MenuItem key={dean} value={dean}>
-                            {dean.replace("DEAN ", "")}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    
-                    <p className="text-sm text-gray-600 mb-1">Secondary Authority (Required):</p>
-                    <FormControl fullWidth>
-                      <Select
-                        value={formData.secondaryAuthority || "Select"}
-                        onChange={(e) => {
-                          setFormData({ ...formData, secondaryAuthority: e.target.value });
-                        }}
-                        displayEmpty
-                        MenuProps={{
-                          PaperProps: {
-                            style: {
-                              maxHeight: 300
-                            }
-                          }
-                        }}
-                      >
-                        <MenuItem value="Select" disabled>Select Secondary Authority</MenuItem>
-                        <MenuItem value="REGISTRAR">Registrar</MenuItem>
-                        
-                        <ListSubheader>Associate Deans</ListSubheader>
-                        {AssociateDeans.map((dean) => (
-                          <MenuItem key={dean} value={dean}>
-                            {dean.replace("ASSOCIATE DEAN ", "")}
-                          </MenuItem>
-                        ))}
-                        
-                        <ListSubheader>Heads of Departments</ListSubheader>
-                        {Hods.map((dept) => (
-                          <MenuItem key={dept} value={dept}>
-                            {dept.replace("HOD ", "")}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </div>
-                )}
-                
-                {formData.category === "BR-B2" && (
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-600 mb-1">Chairman is the approving authority:</p>
-                    <FormControl fullWidth className="mb-3">
-                      <Select
-                        value={checkedValues.length > 0 ? checkedValues[0] : "CHAIRMAN"}
-                        onChange={(e) => {
-                          setCheckedValues([e.target.value]);
-                        }}
-                        displayEmpty
-                      >
-                        <MenuItem value="CHAIRMAN">Chairman</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </div>
-                )}
-                </div>
-              )}
-            {(formData.category === "ES-B" ||
-              formData.category === "BR-B1" ||
-              formData.category === "BR-B2") && (
-              <>
-                <label>Payment*:</label>
-
-                <select
-                  name="source"
-                  className="w-full h-12 border rounded-md border-gray-300 p-2 mb-5 whitespace-pre"
-                  onChange={handleChange}
-                  value={formData.source}
+            </div>
+                {showCheckbox && (
+      <div className="w-full p-2 mb-5">
+        <label className="font-semibold mb-2 block">Approving Authority*:</label>
+        {validationError && <div className="text-red-500 text-sm mb-2">{validationError}</div>}
+        
+        {/* Category-specific instructions */}
+        <div className="text-sm text-gray-600 mb-3 whitespace-normal overflow-visible">
+          {formData.category === "ES-A" && "Select one authority: Director or any Dean"}
+          {formData.category === "ES-B" && "Chairman is automatically selected"}
+          {formData.category === "BR-A" && "Select one: Director OR Registrar OR any Dean (with Associate/Concerned Dean)"}
+          {formData.category === "BR-B1" && "Select a Dean as primary plus a secondary authority"}
+          {formData.category === "BR-B2" && "Chairman is automatically selected"}
+        </div>
+        
+        {/* ES-A: Using Clean Dropdown */}
+        {formData.category === "ES-A" && (
+          <FormControl fullWidth variant="outlined" className="mb-4">
+            <InputLabel>Select Approving Authority</InputLabel>
+            <Select
+              value={checkedValues.length > 0 ? checkedValues[0] : ""}
+              onChange={(e) => {
+                setCheckedValues([e.target.value]);
+                setFormData({...formData, primaryAuthority: e.target.value});
+              }}
+              label="Select Approving Authority"
+            >
+              <MenuItem value="DIRECTOR">DIRECTOR</MenuItem>
+              <ListSubheader>Deans</ListSubheader>
+              {Deans.map(dean => (
+                <MenuItem key={dean} value={dean}>{dean}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        
+        {/* ES-B: Using Clean Dropdown (disabled) */}
+        {formData.category === "ES-B" && (
+          <FormControl fullWidth variant="outlined" className="mb-4">
+            <InputLabel>Approving Authority</InputLabel>
+            <Select
+              value="CHAIRMAN"
+              label="Approving Authority"
+              disabled
+            >
+              <MenuItem value="CHAIRMAN">CHAIRMAN</MenuItem>
+            </Select>
+            <div className="mt-2 text-sm text-blue-600">
+              <i className="fas fa-info-circle"></i> Request will be sent to the Chairman
+            </div>
+          </FormControl>
+        )}
+        
+        {/* BR-A: Primary Authority Dropdown with Conditional Secondary */}
+        {formData.category === "BR-A" && (
+          <>
+            <FormControl fullWidth variant="outlined" className="mb-3">
+              <InputLabel>Primary Authority</InputLabel>
+              <Select
+                value={formData.primaryAuthority !== "Select" ? formData.primaryAuthority : ""}
+                onChange={(e) => {
+                  if (e.target.value === "DIRECTOR") {
+                    // Director only
+                    setCheckedValues(["DIRECTOR"]);
+                    setFormData({...formData, primaryAuthority: e.target.value, secondaryAuthority: "Select"});
+                  } else if (e.target.value === "REGISTRAR") {
+                    // Registrar only
+                    setCheckedValues(["REGISTRAR"]);
+                    setFormData({...formData, primaryAuthority: e.target.value, secondaryAuthority: "Select"});
+                  } else if (Deans.includes(e.target.value)) {
+                    // Dean selected, will need a secondary authority
+                    setCheckedValues([e.target.value]);
+                    setFormData({...formData, primaryAuthority: e.target.value, secondaryAuthority: "Select"});
+                  }
+                }}
+                label="Primary Authority"
+                MenuProps={{
+                  PaperProps: { style: { maxHeight: 300 } }
+                }}
+              >
+                <MenuItem value="DIRECTOR">DIRECTOR</MenuItem>
+                <MenuItem value="REGISTRAR">REGISTRAR</MenuItem>
+                <ListSubheader style={{ lineHeight: '30px', backgroundColor: '#f5f5f5' }}>Deans</ListSubheader>
+                {Deans.map(dean => (
+                  <MenuItem key={dean} value={dean}>
+                    <div style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}>{dean}</div>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {/* Secondary Dropdown (only shows if Dean is selected) */}
+            {formData.primaryAuthority !== "Select" && 
+             formData.primaryAuthority !== "DIRECTOR" && 
+             formData.primaryAuthority !== "REGISTRAR" && 
+             Deans.includes(formData.primaryAuthority) && (
+              <FormControl fullWidth variant="outlined" className="mb-3">
+                <InputLabel>Secondary Authority</InputLabel>
+                <Select
+                  value={formData.secondaryAuthority !== "Select" ? formData.secondaryAuthority : ""}
+                  onChange={(e) => {
+                    setFormData({...formData, secondaryAuthority: e.target.value});
+                    setCheckedValues([formData.primaryAuthority, e.target.value]);
+                  }}
+                  label="Secondary Authority"
+                  MenuProps={{
+                    PaperProps: { style: { maxHeight: 300 } }
+                  }}
                 >
-                  <option value="GUEST">Paid by guest</option>
-                  <option value="DEPARTMENT">Paid by department</option>
-                  <option value="OTHERS">Paid by other sources</option>
-                </select>
-              </>
+                  <ListSubheader style={{ lineHeight: '30px', backgroundColor: '#f5f5f5' }}>Associate Deans</ListSubheader>
+                  {AssociateDeans.map(assocDean => (
+                    <MenuItem key={assocDean} value={assocDean}>
+                      <div style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}>{assocDean}</div>
+                    </MenuItem>
+                  ))}
+                </Select>
+                {formData.secondaryAuthority !== "Select" && (
+                  <div className="mt-2 text-sm text-blue-600 whitespace-normal">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    Request will be sent to both {formData.primaryAuthority} and {formData.secondaryAuthority}
+                  </div>
+                )}
+              </FormControl>
             )}
+            
+            {/* Info for single authority selections */}
+            {(formData.primaryAuthority === "DIRECTOR" || formData.primaryAuthority === "REGISTRAR") && (
+              <div className="mt-2 text-sm text-blue-600 whitespace-normal">
+                <i className="fas fa-info-circle mr-1"></i>
+                Request will be sent to the {formData.primaryAuthority}
+              </div>
+            )}
+          </>
+        )}
+        
+        {/* BR-B1: Primary and Secondary Dropdowns */}
+        {formData.category === "BR-B1" && (
+          <>
+            <FormControl fullWidth variant="outlined" className="mb-3">
+              <InputLabel>Primary Authority (Dean)</InputLabel>
+              <Select
+                value={formData.primaryAuthority !== "Select" ? formData.primaryAuthority : ""}
+                onChange={(e) => {
+                  setCheckedValues([e.target.value]);
+                  setFormData({...formData, primaryAuthority: e.target.value, secondaryAuthority: "Select"});
+                }}
+                label="Primary Authority (Dean)"
+              >
+                {Deans.map(dean => (
+                  <MenuItem key={dean} value={dean}>{dean}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            <FormControl fullWidth variant="outlined" className="mb-3" 
+              disabled={formData.primaryAuthority === "Select"}
+            >
+              <InputLabel>Secondary Authority</InputLabel>
+              <Select
+                value={formData.secondaryAuthority !== "Select" ? formData.secondaryAuthority : ""}
+                onChange={(e) => {
+                  setFormData({...formData, secondaryAuthority: e.target.value});
+                  if (formData.primaryAuthority !== "Select") {
+                    setCheckedValues([formData.primaryAuthority, e.target.value]);
+                  }
+                }}
+                label="Secondary Authority"
+              >
+                <MenuItem value="REGISTRAR">REGISTRAR</MenuItem>
+                <ListSubheader>Associate Deans</ListSubheader>
+                {AssociateDeans.map(assocDean => (
+                  <MenuItem key={assocDean} value={assocDean}>{assocDean}</MenuItem>
+                ))}
+                <ListSubheader>Heads of Departments</ListSubheader>
+                {Hods.map(hod => (
+                  <MenuItem key={hod} value={hod}>
+                  <div style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}>{hod}</div>
+                </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {formData.primaryAuthority !== "Select" && formData.secondaryAuthority !== "Select" && (
+              <div className="mt-2 text-sm text-blue-600">
+                <i className="fas fa-info-circle"></i> Request will be sent to both {formData.primaryAuthority} and {formData.secondaryAuthority}
+              </div>
+            )}
+          </>
+        )}
+        
+        {/* BR-B2: Using Clean Dropdown (disabled) */}
+        {formData.category === "BR-B2" && (
+          <FormControl fullWidth variant="outlined" className="mb-4">
+            <InputLabel>Approving Authority</InputLabel>
+            <Select
+              value="CHAIRMAN"
+              label="Approving Authority"
+              disabled
+            >
+              <MenuItem value="CHAIRMAN">CHAIRMAN</MenuItem>
+            </Select>
+            <div className="mt-2 text-sm text-blue-600">
+              <i className="fas fa-info-circle"></i> Request will be sent to the Chairman
+            </div>
+          </FormControl>
+        )}
+      </div>
+    )}
+              {(formData.category === "ES-B" ||
+                formData.category === "BR-B1" ||
+                formData.category === "BR-B2") && (
+                <>
+                  <label>Payment*:</label>
+                  <select
+                    name="source"
+                    className="w-full h-12 border rounded-md border-gray-300 p-2 mb-5 whitespace-pre"
+                    onChange={handleChange}
+                    value={formData.source}
+                  >
+                    <option value="GUEST">Paid by guest</option>
+                    <option value="DEPARTMENT">Paid by department</option>
+                    <option value="OTHERS">Paid by other sources</option>
+                  </select>
+                  {/* ————————————————————————————— Popup for Department/Other ————————————————————————————— */}
+                  {openSourceDialog && (
+                    <Dialog open onClose={() => setOpenSourceDialog(false)}>
+                      <DialogTitle>
+                        {formData.source === "DEPARTMENT"
+                          ? "Enter Department Name"
+                          : "Specify Other Source"}
+                      </DialogTitle>
+                      <DialogContent>
+                        <TextField
+                          autoFocus
+                          margin="dense"
+                          fullWidth
+                          label={formData.source === "DEPARTMENT" ? "Department" : "Source"}
+                          value={tempSourceName}
+                          onChange={e => {
+                            setTempSourceName(e.target.value);
+                            setErrorText((p) => ({ ...p, sourceName: "" })); 
+                          }}      
+                          error={!!errorText.sourceName}
+                          helperText={errorText.sourceName}                                          
+                        />
+                      </DialogContent>
+                      <DialogActions>
+                        <Button onClick={() => setOpenSourceDialog(false)}>Cancel</Button>
+                        <Button
+                          onClick={() => {
+                            if (!tempSourceName.trim()) {
+                              setErrorText((p) => ({ ...p, sourceName: "This field is required" }));
+                              return;
+                            }                        
+                            setFormData(prev => ({ ...prev, sourceName: tempSourceName }));
+                            setOpenSourceDialog(false);
+                            setErrorText((p) => ({ ...p, sourceName: "" })); 
+                          }}
+                          variant="contained"
+                        >
+                          Save
+                        </Button>
+                      </DialogActions>
+                    </Dialog>
+                  )}
+
+                  {/* show compact chip once saved */}
+                  {formData.sourceName && (
+                    <Chip
+                      label={formData.sourceName}
+                      size="small"
+                      sx={{ mt: 1, mb: 2 }}
+                    />
+                  )}
+                  {/* —————————————————————————————————————————————————————————————————————————————— */}
+
+                </>
+              )}
+
             Add attachements for proof of category (if any):
             <div className="flex mt-2 gap-10">
               <div>
                 <InputFileUpload className="" onFileUpload={handleFileUpload} />
               </div>
 
-
               {Array.from(files).length > 0 ? (
                 <div className="flex flex-col  overflow-y-auto max-w-[30rem] h-16 gap-2 pr-2">
-                  {Array.from(files).map((file, index) => {
-                    const arr = file.name.split(".");
-                    const ext = arr[arr.length - 1];
-                    return (
-                      <div className="flex gap-4 items-center">
-                        <div className="w-7">
+                  {Array.from(files).map((file, index) => (
+                    <div
+                      key={index}
+                      className="p-2 rounded-md bg-gray-100 flex gap-2 items-center"
+                    >
+                      <div className="w-8 h-8">
                           <FileIcon
-                            className=""
-                            extension={ext}
-                            {...defaultStyles}
+                          extension={file.name.split(".").pop()}
+                          {...defaultStyles[file.name.split(".").pop()]}
                           />
                         </div>
-                        <div
-                          onClick={() => {
-                            window.open(window.URL.createObjectURL(file));
-                          }}
-                          className="text-sm text-gray-500 hover:text-blue-500 cursor-pointer"
-                        >
+                      <span className="text-sm truncate max-w-[150px]">
                           {file.name}
+                      </span>
                         </div>
-                      </div>
-                    );
-                  })}
+                  ))}
                 </div>
               ) : formData.category === "ES-A" || formData.category === "ES-B" ? (
                 <div className="flex items-center text-gray-500">
@@ -1078,93 +1519,93 @@ function AdminReservationForm() {
                 />
               </div>
             </div>
-          </div>
-          
-          {/* Signature Section */}
-          <div className="mt-5 border p-4 rounded-md">
-            <h3 className="font-semibold mb-3">Applicant Signature*:</h3>
-            
-            <div className="flex gap-4 mb-4">
-              <button 
-                type="button"
-                onClick={() => setSignatureMethod('type')}
-                className={`px-3 py-2 rounded-md ${signatureMethod === 'type' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-              >
-                Type Signature
-              </button>
+
+            {/* Signature Section */}
+            <div className="mt-5 border p-4 rounded-md">
+              <h3 className="font-semibold mb-3">Applicant Signature*:</h3>
               
-              <button 
-                type="button"
-                onClick={() => setSignatureMethod('upload')}
-                className={`px-3 py-2 rounded-md ${signatureMethod === 'upload' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-              >
-                Upload Signature
-              </button>
-            </div>
-            
-            {signatureMethod === 'type' && (
-              <div className="mb-4">
-                <input
-                  type="text"
-                  placeholder="Type your name"
-                  value={signatureText}
-                  onChange={(e) => setSignatureText(e.target.value)}
-                  className="w-full p-2 border rounded-md mb-2 font-signature text-xl"
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={saveTextSignature}
-                    className="bg-green-500 text-white px-4 py-2 rounded-md"
-                  >
-                    Save Signature
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSignatureText('')}
-                    className="bg-red-500 text-white px-4 py-2 rounded-md"
-                  >
-                    Clear
-                  </button>
-                </div>
-                {signatureText && (
-                  <div className="mt-3 p-3 border rounded-md">
-                    <p className="font-signature text-xl">{signatureText}</p>
-                  </div>
-                )}
+              <div className="flex gap-4 mb-4">
+                <button 
+                  type="button"
+                  onClick={() => setSignatureMethod('type')}
+                  className={`px-3 py-2 rounded-md ${signatureMethod === 'type' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                >
+                  Type Signature
+                </button>
+                
+                <button 
+                  type="button"
+                  onClick={() => setSignatureMethod('upload')}
+                  className={`px-3 py-2 rounded-md ${signatureMethod === 'upload' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                >
+                  Upload Signature
+                </button>
               </div>
-            )}
-            
-            {signatureMethod === 'upload' && (
-              <div className="mb-4">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleSignatureUpload}
-                  className="w-full p-2 border rounded-md mb-2"
-                />
-                <p className="text-gray-500 text-sm">
-                  Please upload a clear image of your signature (JPG, PNG or GIF format)
-                </p>
-              </div>
-            )}
-            
-            {formData.signature && (
-              <div className="mt-3 p-3 border rounded-md">
-                <p className="font-semibold mb-2">Your saved signature:</p>
-                {formData.signature.type === 'image' ? (
-                  <img 
-                    src={formData.signature.data} 
-                    alt="Signature" 
-                    className="max-h-20" 
+              
+              {signatureMethod === 'type' && (
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    placeholder="Type your name"
+                    value={signatureText}
+                    onChange={(e) => setSignatureText(e.target.value)}
+                    className="w-full p-2 border rounded-md mb-2 font-signature text-xl"
                   />
-                ) : (
-                  <p className="font-signature text-xl">{formData.signature.data}</p>
-                )}
-              </div>
-            )}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={saveTextSignature}
+                      className="bg-green-500 text-white px-4 py-2 rounded-md"
+                    >
+                      Save Signature
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSignatureText('')}
+                      className="bg-red-500 text-white px-4 py-2 rounded-md"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  {signatureText && (
+                    <div className="mt-3 p-3 border rounded-md">
+                      <p className="font-signature text-xl">{signatureText}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {signatureMethod === 'upload' && (
+                <div className="mb-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleSignatureUpload}
+                    className="w-full p-2 border rounded-md mb-2"
+                  />
+                  <p className="text-gray-500 text-sm">
+                    Please upload a clear image of your signature (JPG, PNG or GIF format)
+                  </p>
+                </div>
+              )}
+              
+              {formData.signature && (
+                <div className="mt-3 p-3 border rounded-md">
+                  <p className="font-semibold mb-2">Your saved signature:</p>
+                  {formData.signature.type === 'image' ? (
+                    <img 
+                      src={formData.signature.data} 
+                      alt="Signature" 
+                      className="max-h-20" 
+                    />
+                  ) : (
+                    <p className="font-signature text-xl">{formData.signature.data}</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          
+
           <div>
             By clicking on Submit, you hereby agree to the{" "}
             <span
