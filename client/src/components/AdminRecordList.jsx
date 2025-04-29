@@ -57,7 +57,7 @@ export default function AdminRecordList({ status = "pending" }) {
   const [showCustomReasonField, setShowCustomReasonField] = useState(false);
 
   const user = useSelector((state) => state.user);
-  const isAdminOrChairman = user.role === "ADMIN" || user.role === "CHAIRMAN";
+  const isAdminOrChairman = user.role !== "USER" || user.role !== "CASHIER";
 
   const filterMap = {
     "Guest Name": "guestName",
@@ -507,16 +507,21 @@ export default function AdminRecordList({ status = "pending" }) {
               <IconButton size="small">
                 <VisibilityIcon />
               </IconButton>
-              { isAdminOrChairman && (
+              {isAdminOrChairman && (
                 <>
-                  <IconButton size="small">
-                    <DoneIcon className="text-green-500" />
-                  </IconButton>
-                  <IconButton size="small">
-                    <CloseIcon className="text-red-500" />
-                  </IconButton>
+                  {status === "pending" && (
+                    <IconButton size="small">
+                      <DoneIcon className="text-green-500" />
+                    </IconButton>
+                  )}
+                  {status !== "rejected" && (
+                    <IconButton size="small">
+                      <CloseIcon className="text-red-500" />
+                    </IconButton>
+                  )}
                 </>
               )}
+
             </div>
           </div>
         </div>
@@ -596,7 +601,7 @@ export default function AdminRecordList({ status = "pending" }) {
                         }}
                       />
                     </IconButton>
-                    { status !== "approved" && isAdminOrChairman && (
+                    { status === "pending" && isAdminOrChairman && (
                       <IconButton size="small">
                         <DoneIcon
                           className="text-green-500"

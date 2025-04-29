@@ -214,10 +214,8 @@ export default function AddRoom() {
 							className="w-full"
 						>
 							<MenuItem value="" disabled>Select Room Type</MenuItem>
-							<MenuItem value="Single Suite Room">Single Suite Room</MenuItem>
-							<MenuItem value="Double Suite Room">Double Suite Room</MenuItem>
-							<MenuItem value="Single executive Room">Single executive Room</MenuItem>
-							<MenuItem value="Double executive Room">Double executive Room</MenuItem>
+							<MenuItem value="Suite Room">Suite Room</MenuItem>
+							<MenuItem value="executive Room">Executive Room</MenuItem>
 						</TextField>
 					</FormControl>
 					<Button variant="contained" onClick={addRoom}>Add Room</Button>
