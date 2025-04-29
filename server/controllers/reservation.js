@@ -1024,6 +1024,37 @@ export const sendReminder = async (req, res) => {
     return res.status(404).json({ message: "Reservation not found" });
   }
   // console.log(reservation);
+
+  if(reservation.payment.source==="DEPARTMENT"){
+    const deptName = reservation.payment.sourceName;
+    const departmentMap = {
+      "electrical": "arnavbansal17559.6@gmail.com",
+      "computer science": "arnav.020704@gmail.com",
+    };
+    const email = departmentMap[deptName.toLowerCase()];
+    if (email) {
+      sendVerificationEmail(
+        [email], 
+        "Payment Reminder",
+        `<div>This is a reminder for payment of your reservation.</div><br><br>
+        <div>Guest Name: ${reservation.guestName}</div>
+            <div>Guest Email: ${reservation.guestEmail}</div>
+            <div>Number of Guests: ${reservation.numberOfGuests}</div>
+            <div>Number of Rooms: ${reservation.numberOfRooms}</div>
+            <div>Room Type: ${reservation.roomType}</div>
+            <div>Purpose: ${reservation.purpose}</div>
+            <div>Arrival Date: ${new Date(reservation.arrivalDate).toISOString().split("T")[0]}</div>
+            <div>Departure Date: ${new Date(reservation.departureDate).toISOString().split("T")[0]}</div>
+            <div>Address: ${reservation.address}</div>
+            <div>Category: ${reservation.category}</div>
+            <div>Payment Amount: ${reservation.payment.amount}</div>`
+      );
+      res.status(200).json({ message: "Reminder sent successfully!" });
+    } else {
+      return res.status(404).json({ message: "Department email not found" });
+    }
+  }
+  else {
   const email = reservation.guestEmail;
   sendVerificationEmail(
     [email], 
@@ -1042,6 +1073,7 @@ export const sendReminder = async (req, res) => {
         <div>Payment Amount: ${reservation.payment.amount}</div>`
   );
   res.status(200).json({ message: "Reminder sent successfully!" });
+}
   } catch (error) {
     res.status(500).json({ message: "Failed to send reminder", error: error.message });
   }
@@ -1059,7 +1091,55 @@ export const sendReminderAll = async (req, res) => {
   if (!reservation) {
     return res.status(404).json({ message: "Reservation not found" });
   }
-  // console.log(reservation);
+  if(reservation.payment.source==="DEPARTMENT"){
+    const deptName = reservation.payment.sourceName;
+    
+    const departmentAliasMap = {
+      "electrical": "electrical",
+      "ee": "electrical",
+      "electrical engineering": "electrical",
+      
+      "cse": "computer science",
+      "computer science": "computer science",
+      "cs": "computer science",
+      "comp sci": "computer science",
+      "computer engineering": "computer science",
+    };
+    
+    const departmentEmailMap = {
+      "electrical": "arnavbansal17559.6@gmail.com",
+      "computer science": "arnav.020704@gmail.com",
+    };
+    
+    // Normalize the input
+    const rawDeptName = reservation.payment.sourceName.toLowerCase().trim();
+    const canonicalDept = departmentAliasMap[rawDeptName];
+    const email = canonicalDept ? departmentEmailMap[canonicalDept] : null;
+    
+    if (!email) {
+      throw new Error("Department email not found");
+    }
+    
+    if (email) {
+      sendVerificationEmail(
+        [email], 
+        "Payment Reminder",
+        `<div>This is a reminder for payment of your reservation.</div><br><br>
+        <div>Guest Name: ${reservation.guestName}</div>
+            <div>Guest Email: ${reservation.guestEmail}</div>
+            <div>Number of Guests: ${reservation.numberOfGuests}</div>
+            <div>Number of Rooms: ${reservation.numberOfRooms}</div>
+            <div>Room Type: ${reservation.roomType}</div>
+            <div>Purpose: ${reservation.purpose}</div>
+            <div>Arrival Date: ${new Date(reservation.arrivalDate).toISOString().split("T")[0]}</div>
+            <div>Departure Date: ${new Date(reservation.departureDate).toISOString().split("T")[0]}</div>
+            <div>Address: ${reservation.address}</div>
+            <div>Category: ${reservation.category}</div>
+            <div>Payment Amount: ${reservation.payment.amount}</div>`
+      );
+    } 
+  }
+  else {
   const email = reservation.guestEmail;
   sendVerificationEmail(
     [email], 
@@ -1077,6 +1157,7 @@ export const sendReminderAll = async (req, res) => {
         <div>Category: ${reservation.category}</div>
         <div>Payment Amount: ${reservation.payment.amount}</div>`
   );
+}
 }
   res.status(200).json({ message: "Reminder sent successfully!" });
   } catch (error) {

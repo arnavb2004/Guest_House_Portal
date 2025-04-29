@@ -79,7 +79,7 @@ function App() {
               />
               <Route path="process_data" element={<VisualizeData/>} />
 
-              <Route path=":id" element={<RecordPage />} />
+              <Route path=":id" element={<AdminRecordPage />} />
             </Route>
           </Route>
 
